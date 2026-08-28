@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V13.5 - KINEMATIC FARMING & MACRO BRIDGE SUITE
+--  MANNISKAFARM V13.6 - KINEMATIC FARMING & MACRO BRIDGE SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -64,7 +64,7 @@ local Config = {
     SpeedCurves = true, AutoRejoin = false, SegmentLooping = false, SegmentStart = 1, SegmentEnd = 5,
     SegmentRepeats = 2, ProximityRadar = false, RadarRadius = 60, RadarAction = "Pause",
     UseExternalBridge = true, BridgeFileName = "macro_bridge.txt",
-    RecordMouseClicks = false -- New Setting
+    RecordMouseClicks = false
 }
 
 if writefile then pcall(function() writefile(Config.BridgeFileName, "IDLE:0") end) end
@@ -190,8 +190,10 @@ activeNodeHalo.Transparency = 1; activeNodeHalo.CastShadow = false
 activeNodeHalo.Parent = visualizerFolder
 
 local visualizerPool = { Nodes = {}, Beams = {}, Labels = {} }
+local renderTicket = 0 -- Global render thread token
 
 clearVisuals = function()
+    renderTicket = renderTicket + 1 -- Kill any active drawing threads instantly
     for _, node in ipairs(visualizerPool.Nodes) do node.Visible = false end
     for _, beam in ipairs(visualizerPool.Beams) do beam.Visible = false end
     for _, lbl in ipairs(visualizerPool.Labels) do lbl.Billboard.Enabled = false end
@@ -254,7 +256,6 @@ local function getVisLabel(idx)
     return lblData
 end
 
-local renderTicket = 0
 renderVisualPath = function(waypointsList)
     renderTicket = renderTicket + 1
     local myTicket = renderTicket
@@ -269,7 +270,8 @@ renderVisualPath = function(waypointsList)
         local prevPos = nil
         for i, data in ipairs(waypointsList) do
             if renderTicket ~= myTicket then return end
-            if i % 200 == 0 then RunService.RenderStepped:Wait() end -- Anti-lag chunking
+            if i % 150 == 0 then RunService.RenderStepped:Wait() end -- Anti-lag chunking
+            if renderTicket ~= myTicket then return end -- Check again after yielding
 
             local node = getVisNode(i)
             node.CFrame = CFrame.new(data.pos)
@@ -541,7 +543,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V13.5"
+    titleLabel.Text = "MANNISKAFARM V13.6"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -1140,7 +1142,7 @@ do
 end
 
 -- =====================================================================
---  LOGIC FORWARD DECLARATIONS (FIX FOR 'attempt to call a nil value')
+--  LOGIC FORWARD DECLARATIONS
 -- =====================================================================
 local sendExternalMacroCommand
 
@@ -1162,23 +1164,6 @@ local lastWaypointTime = 0
 local holdStartTick = nil
 local mb1StartTick = nil
 local currentLoopCount = 0
-
-updateTelemetry = function(currentNode, totalNodes)
-    totalNodes = totalNodes or 0
-    local loopTargetStr = (Config.TargetLoops == 0) and "Inf" or tostring(Config.TargetLoops)
-    if currentNode and totalNodes > 0 then
-        nodeStatsLabel.Text = string.format("Node: %d/%d | Loop: %d/%s", currentNode, totalNodes, currentLoopCount, loopTargetStr)
-        hudNodeLabel.Text = string.format("Node: %d/%d", currentNode, totalNodes)
-        local progress = math.clamp(currentNode / totalNodes, 0, 1)
-        TweenService:Create(progressBar, TweenInfo.new(0.1), { Size = UDim2.new(progress, 0, 1, 0) }):Play()
-    else
-        nodeStatsLabel.Text = string.format("Waypoints: %d | Loop: %d/%s", totalNodes, currentLoopCount, loopTargetStr)
-        hudNodeLabel.Text = string.format("Nodes: %d", totalNodes)
-        progressBar.Size = UDim2.new(0, 0, 1, 0)
-    end
-    routeModeLabel.Text = string.format("%s (%.2fx)", Config.PlaybackMode, Config.SpeedMultiplier)
-    hudLoopLabel.Text = string.format("Loop: %d/%s | %.1fx", currentLoopCount, loopTargetStr, Config.SpeedMultiplier)
-end
 
 local function hookDeathFailSafe()
     if deathConnection then deathConnection:Disconnect(); deathConnection = nil end
@@ -1203,7 +1188,8 @@ local function hookInputListeners()
     end)
 
     keyConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if isRecording and not gameProcessed then
+        -- REMOVED "not gameProcessed" check so we capture UI-consumed key presses
+        if isRecording then
             if input.KeyCode == Enum.KeyCode.E then
                 holdStartTick = tick()
             elseif Config.RecordMouseClicks and input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -1394,7 +1380,6 @@ local function resolveAndTriggerPrompt(data, root)
     if hum then hum:Move(Vector3.zero, false) end
     if root then root.AssemblyLinearVelocity = Vector3.zero end
 
-    -- STRICT RECORDED DURATION INJECTION
     local baseHoldTimeMs = math.floor((data.actionHoldDuration or 0.2) * 1000)
     local bufferedHoldTimeMs = baseHoldTimeMs + 150 -- 150ms buffer for hardware bridge
     local bufferedHoldTimeSec = bufferedHoldTimeMs / 1000
@@ -1744,4 +1729,4 @@ _G.Autofarm_Control = {
     Save = saveRouteToFile, Load = loadRouteFromFile, Export = copyRouteToClipboard, Terminate = terminateProcess, Config = Config, Keybinds = Keybinds
 }
 
-print("🚀 Autofarm V13.5 (Adornment Overhaul & Click Recording) Loaded.")
+print("🚀 Autofarm V13.6 (Fixed Interaction Input & Strict Timing) Loaded.")
