@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V12.4 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V12.5 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -148,7 +148,8 @@ local Config = {
     RadarAction = "Pause",
     
     UseExternalBridge = true,
-    BridgeFileName = "macro_bridge.txt"
+    BridgeFileName = "macro_bridge.txt",
+    RecordMouseClicks = false
 }
 
 if writefile then
@@ -300,10 +301,20 @@ local errorModal, statusHUD, hudBadgeLabel, hudNodeLabel, hudLoopLabel, hudBadge
 -- Global Control Forward References
 local startRecording, stopRecording, startPlayback, stopPlayback, clearWaypoints, undoLastNode, saveRouteToFile, loadRouteFromFile, copyRouteToClipboard, terminateProcess
 
--- Visualizer Setup
+-- =====================================================================
+--  ADORNMENT VISUALIZER & OBJECT POOLING (LAG FIX)
+-- =====================================================================
 local visualizerFolder = workspace:FindFirstChild("ManniskaPathVisualizer") or Instance.new("Folder")
 visualizerFolder.Name = "ManniskaPathVisualizer"
 visualizerFolder.Parent = workspace
+
+local visualizerAnchor = workspace:FindFirstChild("ManniskaVisAnchor") or Instance.new("Part")
+visualizerAnchor.Name = "ManniskaVisAnchor"
+visualizerAnchor.Anchored = true
+visualizerAnchor.CanCollide = false
+visualizerAnchor.Transparency = 1
+visualizerAnchor.Position = Vector3.zero
+visualizerAnchor.Parent = workspace
 
 local activeNodeHalo = Instance.new("Part")
 activeNodeHalo.Name = "ActiveTargetHalo"
@@ -317,12 +328,58 @@ activeNodeHalo.Transparency = 1
 activeNodeHalo.CastShadow = false
 activeNodeHalo.Parent = visualizerFolder
 
+local visualizerPool = { Nodes = {}, Beams = {}, Labels = {} }
+local renderTicket = 0
+
+local function getVisNode(idx)
+    if visualizerPool.Nodes[idx] then return visualizerPool.Nodes[idx] end
+    local sphere = Instance.new("SphereHandleAdornment")
+    sphere.Adornee = visualizerAnchor
+    sphere.ZIndex = 1
+    sphere.AlwaysOnTop = false
+    sphere.Parent = visualizerFolder
+    visualizerPool.Nodes[idx] = sphere
+    return sphere
+end
+
+local function getVisBeam(idx)
+    if visualizerPool.Beams[idx] then return visualizerPool.Beams[idx] end
+    local line = Instance.new("LineHandleAdornment")
+    line.Adornee = visualizerAnchor
+    line.Thickness = 4
+    line.ZIndex = 0
+    line.AlwaysOnTop = false
+    line.Parent = visualizerFolder
+    visualizerPool.Beams[idx] = line
+    return line
+end
+
+local function getVisLabel(idx)
+    if visualizerPool.Labels[idx] then return visualizerPool.Labels[idx] end
+    local attach = Instance.new("Attachment")
+    attach.Parent = visualizerAnchor
+    local billboard = Instance.new("BillboardGui")
+    billboard.Adornee = attach
+    billboard.Size = UDim2.new(0, 48, 0, 18)
+    billboard.StudsOffset = Vector3.new(0, 1.2, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = visualizerFolder
+    local tag = Instance.new("TextLabel")
+    tag.Size = UDim2.new(1, 0, 1, 0)
+    tag.BackgroundTransparency = 1
+    tag.TextSize = 10
+    tag.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+    tag.Parent = billboard
+    local lblData = { Billboard = billboard, Tag = tag, Attach = attach }
+    visualizerPool.Labels[idx] = lblData
+    return lblData
+end
+
 clearVisuals = function()
-    for _, child in ipairs(visualizerFolder:GetChildren()) do
-        if child ~= activeNodeHalo then
-            child:Destroy()
-        end
-    end
+    renderTicket = renderTicket + 1
+    for _, node in ipairs(visualizerPool.Nodes) do node.Visible = false end
+    for _, beam in ipairs(visualizerPool.Beams) do beam.Visible = false end
+    for _, lbl in ipairs(visualizerPool.Labels) do lbl.Billboard.Enabled = false end
     activeNodeHalo.Transparency = 1
 end
 
@@ -335,7 +392,7 @@ setHaloTarget = function(pos)
     activeNodeHalo.Transparency = 0.3
 end
 
--- Scoped UI Construction (Fixes Register Limit 200)
+-- Scoped UI Construction
 do
     errorModal = Instance.new("Frame")
     errorModal.Name = "ErrorModal"
@@ -592,7 +649,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V12.4"
+    titleLabel.Text = "MANNISKAFARM V12.5"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -1470,17 +1527,17 @@ do
         modeIdx = (modeIdx % #modes) + 1
         Config.PlaybackMode = modes[modeIdx]
         modeBtn.Text = Config.PlaybackMode
-        updateTelemetry(nil, #AppState.Waypoints)
+        updateTelemetry(nil, #Waypoints)
     end)
 
     createSliderRow(settingsPage, "LoopSlider", "Loop Count Limit", 0, 200, Config.TargetLoops, "Loops: %d", function(val)
         Config.TargetLoops = math.floor(val)
-        updateTelemetry(nil, #AppState.Waypoints)
+        updateTelemetry(nil, #Waypoints)
     end, 3)
 
     createSliderRow(settingsPage, "SpeedSlider", "Playback Speed", 0.5, 3.0, Config.SpeedMultiplier, "%.2fx", function(val)
         Config.SpeedMultiplier = math.floor(val * 100) / 100
-        updateTelemetry(nil, #AppState.Waypoints)
+        updateTelemetry(nil, #Waypoints)
     end, 4)
 
     createSectionHeader(settingsPage, "Hardware Bridge & Integration", 5)
@@ -1503,17 +1560,17 @@ do
 
     createToggleRow(settingsPage, "WaypointLabelsToggle", "3D Waypoint Tags ([E], [Start], [End])", activeTheme.Accent, function(state)
         Config.WaypointLabelsEnabled = state
-        renderVisualPath(AppState.Waypoints)
+        renderVisualPath(Waypoints)
     end, 10, Config.WaypointLabelsEnabled)
 
     createToggleRow(settingsPage, "VisualizerToggle", "3D Workspace Visualizer", activeTheme.Accent, function(state)
         Config.VisualizerEnabled = state
-        if state then renderVisualPath(AppState.Waypoints) else clearVisuals() end
+        if state then renderVisualPath(Waypoints) else clearVisuals() end
     end, 11, Config.VisualizerEnabled)
 
     createSliderRow(settingsPage, "OrbOpacitySlider", "Visualizer Orb Opacity", 0.0, 0.8, Config.VisualizerOpacity, "Opacity: %.2f", function(val)
         Config.VisualizerOpacity = math.floor(val * 100) / 100
-        renderVisualPath(AppState.Waypoints)
+        renderVisualPath(Waypoints)
     end, 12)
 
     createSectionHeader(settingsPage, "Keybind Shortcuts", 13)
@@ -1779,6 +1836,12 @@ do
         Config.SpeedCurves = state
     end, 6, Config.SpeedCurves)
 
+    createSectionHeader(advancedPage, "Input Recording", 13)
+
+    createToggleRow(advancedPage, "RecordClicksToggle", "Record Mouse Clicks (MB1)", activeTheme.Accent, function(state)
+        Config.RecordMouseClicks = state
+    end, 14, Config.RecordMouseClicks)
+
     createSectionHeader(advancedPage, "Segment Sub-Looping", 7)
 
     createToggleRow(advancedPage, "SegmentToggle", "Enable Waypoint Segment Loop", activeTheme.Accent, function(state)
@@ -1908,6 +1971,7 @@ do
         table.clear(scriptConnections)
 
         if visualizerFolder then visualizerFolder:Destroy() end
+        if visualizerAnchor then visualizerAnchor:Destroy() end
         _G.Autofarm_Control = nil
         if screenGui then screenGui:Destroy() end
         print("[ManniskaFarm] Unloaded successfully.")
@@ -2036,429 +2100,39 @@ updateTelemetry = function(currentNode, totalNodes)
     hudLoopLabel.Text = string.format("Loop: %d/%s | %.1fx", currentLoopCount, loopTargetStr, Config.SpeedMultiplier)
 end
 
--- Visualizer Renderer
-renderVisualPath = function(waypointsList)
-    clearVisuals()
-    if not Config.VisualizerEnabled or #waypointsList == 0 then return end
-
-    local prevNode = nil
-    for i, data in ipairs(waypointsList) do
-        local node = Instance.new("Part")
-        node.Name = "Node_" .. i
-        node.Shape = Enum.PartType.Ball
-        node.Size = (i == 1 or i == #waypointsList) and Vector3.new(1.1, 1.1, 1.1) or Vector3.new(0.7, 0.7, 0.7)
-        node.Position = data.pos
-        node.Anchored = true
-        node.CanCollide = false
-        node.Material = Enum.Material.Neon
-        node.Transparency = Config.VisualizerOpacity
-        node.CastShadow = false
-
-        if i == 1 then
-            node.Color = Color3.fromRGB(0, 255, 128)
-        elseif i == #waypointsList then
-            node.Color = Color3.fromRGB(255, 60, 60)
-        elseif data.action or data.actionPromptName or data.isInteractionNode then
-            node.Color = Color3.fromRGB(0, 170, 255)
-        elseif data.pauseDuration and data.pauseDuration > 0.5 then
-            node.Color = Color3.fromRGB(255, 215, 0)
-        elseif data.jump then
-            node.Color = Color3.fromRGB(255, 170, 0)
-        elseif data.isSprinting then
-            node.Color = Color3.fromRGB(255, 80, 180)
-        else
-            node.Color = Color3.fromRGB(50, 220, 120)
-        end
-        node.Parent = visualizerFolder
-
-        if Config.WaypointLabelsEnabled then
-            local billboard = Instance.new("BillboardGui")
-            billboard.Name = "Label"
-            billboard.Adornee = node
-            billboard.Size = UDim2.new(0, 48, 0, 18)
-            billboard.StudsOffset = Vector3.new(0, 1.2, 0)
-            billboard.AlwaysOnTop = true
-            billboard.Parent = node
-
-            local tag = Instance.new("TextLabel")
-            tag.Size = UDim2.new(1, 0, 1, 0)
-            tag.BackgroundTransparency = 1
-            if i == 1 then
-                tag.Text = "[START]"
-                tag.TextColor3 = Color3.fromRGB(0, 255, 128)
-            elseif i == #waypointsList then
-                tag.Text = "[END]"
-                tag.TextColor3 = Color3.fromRGB(255, 80, 80)
-            elseif data.action or data.actionPromptName or data.isInteractionNode then
-                tag.Text = string.format("[E %s]", data.actionHoldDuration and string.format("%.1fs", data.actionHoldDuration) or "")
-                tag.TextColor3 = Color3.fromRGB(0, 200, 255)
-            elseif data.pauseDuration and data.pauseDuration > 0.5 then
-                tag.Text = string.format("[%.1fs]", data.pauseDuration)
-                tag.TextColor3 = Color3.fromRGB(255, 215, 0)
-            else
-                tag.Text = tostring(i)
-                tag.TextColor3 = Color3.fromRGB(255, 255, 255)
-            end
-            tag.TextSize = 10
-            tag.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
-            tag.Parent = billboard
-        end
-
-        if prevNode then
-            local beam = Instance.new("Part")
-            beam.Anchored = true
-            beam.CanCollide = false
-            beam.Material = Enum.Material.Neon
-            beam.Color = Color3.fromRGB(120, 120, 140)
-            beam.Transparency = math.clamp(Config.VisualizerOpacity + 0.3, 0, 0.9)
-            beam.CastShadow = false
-
-            local distance = (data.pos - prevNode.Position).Magnitude
-            if distance > 0.1 then
-                beam.Size = Vector3.new(0.12, 0.12, distance)
-                beam.CFrame = CFrame.lookAt(prevNode.Position, data.pos) * CFrame.new(0, 0, -distance / 2)
-                beam.Parent = visualizerFolder
-            end
-        end
-        prevNode = node
-    end
-end
-
--- Kinematics & Record Engine State
-local Waypoints = {}
-local isRecording = false
-local isPlaying = false
-local promptConnection, jumpConnection, keyConnection, keyEndConnection, stateConnection, deathConnection
-local jumpTriggered = false
-local lastWaypointTime, lastPromptClickTime = 0, 0
-local holdStartTick = nil
-
-local function hookDeathFailSafe()
-    if deathConnection then deathConnection:Disconnect(); deathConnection = nil end
-    local char, _, hum = getCharacter()
-    if hum then
-        deathConnection = hum.Died:Connect(function()
-            if (isRecording or isPlaying) and Config.EmergencyLeaveOnDeath then
-                print("[ManniskaFarm] Emergency Leave: Character died. Disconnecting...")
-                game:Shutdown()
-            end
-        end)
-    elseif char and typeof(char) == "Instance" then
-        deathConnection = char.AncestryChanged:Connect(function(_, parentObj)
-            if not parentObj and (isRecording or isPlaying) and Config.EmergencyLeaveOnDeath then
-                print("[ManniskaFarm] Emergency Leave: Character destroyed. Disconnecting...")
-                game:Shutdown()
-            end
-        end)
-    end
-end
-
-player.CharacterAdded:Connect(function()
-    task.wait(0.5)
-    hookDeathFailSafe()
-end)
-hookDeathFailSafe()
-
-local function hookJumpListeners()
-    if jumpConnection then jumpConnection:Disconnect(); jumpConnection = nil end
-    if stateConnection then stateConnection:Disconnect(); stateConnection = nil end
-    if keyConnection then keyConnection:Disconnect(); keyConnection = nil end
-    if keyEndConnection then keyEndConnection:Disconnect(); keyEndConnection = nil end
-
-    jumpConnection = UserInputService.JumpRequest:Connect(function()
-        if isRecording then
-            jumpTriggered = true
-        end
-    end)
-
-    -- Capture manual 'E' interactions during recording
-    keyConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if isRecording and input.KeyCode == Enum.KeyCode.E then
-            holdStartTick = tick()
-        end
-    end)
-
-    keyEndConnection = UserInputService.InputEnded:Connect(function(input)
-        if isRecording and input.KeyCode == Enum.KeyCode.E and holdStartTick then
-            local rawDuration = tick() - holdStartTick
-            local finalDuration = math.max(rawDuration, 0.2)
-            holdStartTick = nil
-
-            local pos = getEntityPosition()
-            if not pos then return end
-            local now = tick()
-            local _, _, h = getCharacter()
-            local cam = workspace.CurrentCamera
-            local aimPos = pos + (cam and (cam.CFrame.LookVector * 3.5) or Vector3.zero)
-
-            table.insert(Waypoints, {
-                pos = pos,
-                promptPos = aimPos,
-                jump = false,
-                pauseDuration = 0,
-                speed = h and h.WalkSpeed or 16,
-                isSprinting = h and (h.WalkSpeed > 17) or false,
-                isInteractionNode = true,
-                actionHoldDuration = math.floor((finalDuration + 0.25) * 10) / 10,
-                interactionCount = 1,
-                interClickDelay = 0.2,
-                delay = now - lastWaypointTime
-            })
-            lastWaypointTime = now
-            updateTelemetry(nil, #Waypoints)
-            if Config.RealtimeVisualizer then renderVisualPath(Waypoints) end
-            showToast(string.format("Interaction Stamped (%.1fs)", finalDuration))
-        end
-    end)
-    table.insert(scriptConnections, keyEndConnection)
-
-    local _, _, hum = getCharacter()
-    if hum then
-        stateConnection = hum.StateChanged:Connect(function(oldState, newState)
-            if isRecording and newState == Enum.HumanoidStateType.Jumping then
-                jumpTriggered = true
-            end
-        end)
-    end
-end
-
-stopRecording = function()
-    isRecording = false
-    jumpTriggered = false
-    holdStartTick = nil
-    if promptConnection then promptConnection:Disconnect(); promptConnection = nil end
-    if jumpConnection then jumpConnection:Disconnect(); jumpConnection = nil end
-    if keyConnection then keyConnection:Disconnect(); keyConnection = nil end
-    if keyEndConnection then keyEndConnection:Disconnect(); keyEndConnection = nil end
-    if stateConnection then stateConnection:Disconnect(); stateConnection = nil end
-    if recordToggleControl and typeof(recordToggleControl.Get) == "function" and recordToggleControl.Get() then
-        recordToggleControl.Set(false, true)
-    end
-    updateStateBadge("IDLE", Color3.fromRGB(60, 65, 80))
-    renderVisualPath(Waypoints)
-    updateTelemetry(nil, #Waypoints)
-    playSoundFeedback(0.9)
-    showToast(string.format("Recording stopped (%d nodes)", #Waypoints))
-end
-
-local function getPromptWorldPosition(prompt)
-    if not prompt or not prompt.Parent then return nil end
-    local parent = prompt.Parent
-    if parent:IsA("BasePart") then
-        return parent.Position
-    elseif parent:IsA("Attachment") then
-        return parent.WorldPosition
-    elseif parent:IsA("Model") then
-        local primary = parent.PrimaryPart or parent:FindFirstChildWhichIsA("BasePart")
-        if primary then return primary.Position end
-    end
-    return nil
-end
-
-startRecording = function()
-    if isRecording then return end
-    if isPlaying then
-        if playToggleControl and typeof(playToggleControl.Set) == "function" then 
-            playToggleControl.Set(false, false) 
-        end
-    end
-
-    local startAttempts = 0
-    local initialPos = nil
-    while startAttempts < 30 do
-        initialPos = getEntityPosition()
-        if initialPos then break end
-        startAttempts = startAttempts + 1
-        task.wait(0.1)
-    end
-
-    if not initialPos then
-        triggerErrorModal("ERR_NO_PHYSICAL_ROOT", "Could not locate a valid physical root part on your character model.")
-        if recordToggleControl and typeof(recordToggleControl.Set) == "function" then
-            recordToggleControl.Set(false, true)
-        end
-        return
-    end
-
-    Waypoints = {}
-    clearVisuals()
-    isRecording = true
-    jumpTriggered = false
-    holdStartTick = nil
-    currentLoopCount = 0
-    lastWaypointTime = tick()
-    lastPromptClickTime = tick()
-    updateStateBadge("REC", activeTheme.RecordActive)
-    playSoundFeedback(1.2)
-    showToast("Recording started...")
-
-    hookJumpListeners()
-
-    local _, _, hum = getCharacter()
-
-    table.insert(Waypoints, {
-        pos = initialPos,
-        jump = false,
-        pauseDuration = 0,
-        speed = hum and hum.WalkSpeed or 16,
-        isSprinting = hum and (hum.WalkSpeed > 17) or false,
-        action = nil,
-        delay = 0.08
-    })
-    updateTelemetry(nil, #Waypoints)
-    if Config.RealtimeVisualizer then
-        renderVisualPath(Waypoints)
-    end
-
-    promptConnection = ProximityPromptService.PromptTriggered:Connect(function(prompt, playerWhoTriggered)
-        if playerWhoTriggered == player and isRecording then
-            local pPos = getEntityPosition()
-            if not pPos then return end
-            local _, _, h = getCharacter()
-            local now = tick()
-            local lastNode = Waypoints[#Waypoints]
-            local interClickDelay = now - lastPromptClickTime
-            lastPromptClickTime = now
-
-            local promptWorldPos = getPromptWorldPosition(prompt) or pPos
-
-            if lastNode and (lastNode.action or lastNode.actionPromptName or lastNode.isInteractionNode) and (pPos - lastNode.pos).Magnitude < 4.5 then
-                lastNode.interactionCount = (lastNode.interactionCount or 1) + 1
-                lastNode.interClickDelay = math.clamp(interClickDelay, 0.05, 3.0)
-                lastNode.delay = (lastNode.delay or 0) + (now - lastWaypointTime)
-                lastWaypointTime = now
-                showToast(string.format("Prompt Stacked: x%d", lastNode.interactionCount))
-                updateTelemetry(nil, #Waypoints)
-                if Config.RealtimeVisualizer then renderVisualPath(Waypoints) end
-                return
-            end
-
-            table.insert(Waypoints, {
-                pos = pPos,
-                promptPos = promptWorldPos,
-                jump = false,
-                pauseDuration = 0,
-                speed = h and h.WalkSpeed or 16,
-                isSprinting = h and (h.WalkSpeed > 17) or false,
-                action = prompt,
-                interactionCount = 1,
-                interClickDelay = 0.15,
-                actionHoldDuration = prompt.HoldDuration or 0,
-                actionPromptName = prompt.Name,
-                actionParentName = prompt.Parent and prompt.Parent.Name or nil,
-                delay = now - lastWaypointTime
-            })
-            lastWaypointTime = now
-            updateTelemetry(nil, #Waypoints)
-            if Config.RealtimeVisualizer then renderVisualPath(Waypoints) end
-            showToast("Prompt Recorded: x1")
-        end
-    end)
-
-    task.spawn(function()
-        local lastRecordedPos = initialPos
-        local standingStillTime = 0
-
-        while isRecording do
-            local pos = getEntityPosition()
-            if pos then
-                local _, _, h = getCharacter()
-                local distMoved = (pos - lastRecordedPos).Magnitude
-                local now = tick()
-                local stampedJump = jumpTriggered
-                jumpTriggered = false
-
-                if distMoved > 0.4 or stampedJump then
-                    standingStillTime = 0
-                    table.insert(Waypoints, {
-                        pos = pos,
-                        jump = stampedJump,
-                        pauseDuration = 0,
-                        speed = h and h.WalkSpeed or 16,
-                        isSprinting = h and (h.WalkSpeed > 17) or false,
-                        action = nil,
-                        delay = now - lastWaypointTime
-                    })
-                    lastRecordedPos = pos
-                    lastWaypointTime = now
-                    updateTelemetry(nil, #Waypoints)
-                    if Config.RealtimeVisualizer then renderVisualPath(Waypoints) end
-                else
-                    standingStillTime = standingStillTime + 0.08
-                    if #Waypoints > 0 and standingStillTime > 0.6 then
-                        Waypoints[#Waypoints].pauseDuration = math.floor(standingStillTime * 10) / 10
-                    end
-                end
-            end
-            task.wait(0.08)
-        end
-    end)
-end
-
-stopPlayback = function()
-    isPlaying = false
-    setHaloTarget(nil)
-    local _, root, hum = getCharacter()
-    if hum and root then
-        hum:MoveTo(root.Position)
-    elseif root then
-        root.AssemblyLinearVelocity = Vector3.zero
-    end
-    if playToggleControl and typeof(playToggleControl.Get) == "function" and playToggleControl.Get() then
-        playToggleControl.Set(false, true)
-    end
-    updateStateBadge("IDLE", Color3.fromRGB(60, 65, 80))
-    updateTelemetry(nil, #Waypoints)
-    showToast("Playback stopped.")
-end
+local lastBridgeWriteTick = 0
+local bridgeQueue = nil
 
 local function sendExternalMacroCommand(key, durationMs)
     if not (writefile and Config.UseExternalBridge) then return false end
+    local now = tick()
+    if (now - lastBridgeWriteTick) < 0.05 then
+        bridgeQueue = { Key = key, Duration = durationMs }
+        return true
+    end
+    lastBridgeWriteTick = now
     local cmd = string.format("HOLD_%s:%d", string.upper(tostring(key)), durationMs)
-    pcall(function()
-        writefile(Config.BridgeFileName, cmd)
+    task.spawn(function()
+        pcall(function()
+            writefile(Config.BridgeFileName, cmd)
+        end)
     end)
     return true
 end
 
--- Dynamic Object Duration Calculator
-local function calculateInteractionDuration(targetPos)
-    local shortestDist = 15
-    local holdDurationMs = 1200
-
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if (obj:IsA("BasePart") or obj:IsA("Attachment") or obj:IsA("Model")) then
-            local p = obj:IsA("Attachment") and obj.WorldPosition or (obj:IsA("BasePart") and obj.Position or (obj.PrimaryPart and obj.PrimaryPart.Position))
-            if p and (p - targetPos).Magnitude < shortestDist then
-                shortestDist = (p - targetPos).Magnitude
-                local name = obj.Name:lower()
-                local parentName = obj.Parent and obj.Parent.Name:lower() or ""
-
-                if name:find("safe") or parentName:find("safe") then
-                    local isClosed = obj:GetAttribute("IsSafeOpen") == false or (obj.Parent and obj.Parent:GetAttribute("IsSafeOpen") == false)
-                    local isLocked = obj:GetAttribute("Locked") == true or (obj.Parent and obj.Parent:GetAttribute("Locked") == true)
-                    
-                    if isLocked or isClosed then
-                        holdDurationMs = 10500
-                    else
-                        holdDurationMs = 1200
-                    end
-                elseif name:find("register") or parentName:find("register") then
-                    if obj:GetAttribute("Locked") ~= false then
-                        holdDurationMs = 5200
-                    else
-                        holdDurationMs = 1200
-                    end
-                elseif name:find("drawer") or parentName:find("drawer") then
-                    holdDurationMs = 5200
-                elseif name:find("gold") or name:find("loot") then
-                    holdDurationMs = 800
-                end
-            end
+task.spawn(function()
+    while true do
+        task.wait(0.05)
+        if bridgeQueue then
+            local q = bridgeQueue
+            bridgeQueue = nil
+            lastBridgeWriteTick = tick()
+            pcall(function()
+                writefile(Config.BridgeFileName, string.format("HOLD_%s:%d", string.upper(tostring(q.Key)), q.Duration))
+            end)
         end
     end
-    return holdDurationMs
-end
+end)
 
 -- Hardware Prompt & ObjectAction Resolver
 local function resolveAndTriggerPrompt(data, root)
@@ -2469,7 +2143,7 @@ local function resolveAndTriggerPrompt(data, root)
     if hum then hum:Move(Vector3.zero, false) end
     if root then root.AssemblyLinearVelocity = Vector3.zero end
 
-    local holdTimeMs = (data.actionHoldDuration and data.actionHoldDuration > 1.5) and math.floor(data.actionHoldDuration * 1000) or calculateInteractionDuration(targetPosition)
+    local holdTimeMs = math.floor((data.actionHoldDuration or 0.2) * 1000) + 150
     local holdTimeSec = holdTimeMs / 1000
     local totalTimes = math.max(data.interactionCount or 1, 1)
 
@@ -2479,7 +2153,8 @@ local function resolveAndTriggerPrompt(data, root)
     if camera and targetPosition then
         camera.CFrame = CFrame.lookAt(camera.CFrame.Position, targetPosition)
     end
-    task.wait(0.15)
+    
+    for _ = 1, 5 do RunService.RenderStepped:Wait() end
 
     for count = 1, totalTimes do
         if not isPlaying then break end
@@ -2674,16 +2349,24 @@ startPlayback = function()
                     hum.WalkSpeed = 16 * Config.SpeedMultiplier * speedDrift
                 end
 
-                if Config.AutoTeleport and not data.action and not data.jump and not data.isInteractionNode then
+                if Config.AutoTeleport and not data.isInteractionNode and not data.jump and not data.isMouseClick then
                     curRoot.CFrame = CFrame.new(data.pos)
                     task.wait(0.02 / Config.SpeedMultiplier)
                 else
-                    if data.action or data.actionPromptName or data.isInteractionNode or data.promptPos then
+                    if data.isMouseClick then
+                        if hum then hum:MoveTo(curRoot.Position) end
+                        local holdTimeMs = math.max(math.floor((data.clickDuration or 0) * 1000), 50)
+                        print(string.format("🖱️ [ManniskaFarm] Dispatching HOLD_MB1:%d to Macro...", holdTimeMs))
+                        sendExternalMacroCommand("MB1", holdTimeMs)
+                        task.wait((data.clickDuration or 0) + 0.1)
+                    end
+
+                    if data.isInteractionNode or data.promptPos then
                         if hum then hum:MoveTo(curRoot.Position) end
                         resolveAndTriggerPrompt(data, curRoot)
                     end
 
-                    if data.pauseDuration and data.pauseDuration > 0.3 and not data.action and not data.isInteractionNode then
+                    if data.pauseDuration and data.pauseDuration > 0.3 and not data.isInteractionNode and not data.isMouseClick then
                         local pauseStart = tick()
                         local totalPause = data.pauseDuration / Config.SpeedMultiplier
 
@@ -2712,7 +2395,7 @@ startPlayback = function()
                     end
 
                     local targetPos = data.pos
-                    if Config.MicroRandomization and not data.action and not data.jump and not data.isInteractionNode then
+                    if Config.MicroRandomization and not data.isInteractionNode and not data.jump and not data.isMouseClick then
                         local driftX = (math.random(-20, 20) / 100)
                         local driftZ = (math.random(-20, 20) / 100)
                         targetPos = targetPos + Vector3.new(driftX, 0, driftZ)
@@ -2799,132 +2482,191 @@ startPlayback = function()
     end)
 end
 
-undoLastNode = function()
-    if #Waypoints > 0 then
-        table.remove(Waypoints)
-        renderVisualPath(Waypoints)
-        updateTelemetry(nil, #Waypoints)
-        showToast(string.format("Undid node #%d", #Waypoints + 1))
-        playSoundFeedback(0.8)
-    else
-        showToast("No nodes to undo.")
-    end
-end
+-- Input Recording Listeners
+local mb1StartTick = nil
+local function hookJumpListeners()
+    if jumpConnection then jumpConnection:Disconnect(); jumpConnection = nil end
+    if stateConnection then stateConnection:Disconnect(); stateConnection = nil end
+    if keyConnection then keyConnection:Disconnect(); keyConnection = nil end
+    if keyEndConnection then keyEndConnection:Disconnect(); keyEndConnection = nil end
 
-clearWaypoints = function()
-    Waypoints = {}
-    clearVisuals()
-    currentLoopCount = 0
-    updateTelemetry(nil, 0)
-    showToast("Route waypoints cleared.")
-end
-
-copyRouteToClipboard = function()
-    if #Waypoints == 0 then
-        showToast("No route data to export.")
-        return
-    end
-
-    local exportTable = {}
-    for _, wp in ipairs(Waypoints) do
-        table.insert(exportTable, {
-            pos = { wp.pos.X, wp.pos.Y, wp.pos.Z },
-            promptPos = wp.promptPos and { wp.promptPos.X, wp.promptPos.Y, wp.promptPos.Z } or nil,
-            jump = wp.jump,
-            pauseDuration = wp.pauseDuration or 0,
-            speed = wp.speed or 16,
-            isSprinting = wp.isSprinting or false,
-            delay = wp.delay or 0.08,
-            isInteractionNode = wp.isInteractionNode or false,
-            interactionCount = wp.interactionCount or 1,
-            interClickDelay = wp.interClickDelay or 0.15,
-            actionHoldDuration = wp.actionHoldDuration or 0,
-            actionPromptName = wp.actionPromptName or nil,
-            actionParentName = wp.actionParentName or nil
-        })
-    end
-
-    local jsonString = HttpService:JSONEncode(exportTable)
-    if setclipboard then
-        setclipboard(jsonString)
-        showToast("Route JSON copied to clipboard!")
-    else
-        showToast("Clipboard API unavailable.")
-    end
-end
-
-saveRouteToFile = function(fileName)
-    local name = (fileName and fileName ~= "") and fileName or Config.FileName
-    if not (writefile and isfile) then
-        triggerErrorModal("ERR_STORAGE_WRITE", "Your executor does not support the 'writefile' API.")
-        return
-    end
-
-    local exportTable = {}
-    for _, wp in ipairs(Waypoints) do
-        table.insert(exportTable, {
-            pos = { wp.pos.X, wp.pos.Y, wp.pos.Z },
-            promptPos = wp.promptPos and { wp.promptPos.X, wp.promptPos.Y, wp.promptPos.Z } or nil,
-            jump = wp.jump,
-            pauseDuration = wp.pauseDuration or 0,
-            speed = wp.speed or 16,
-            isSprinting = wp.isSprinting or false,
-            delay = wp.delay or 0.08,
-            isInteractionNode = wp.isInteractionNode or false,
-            interactionCount = wp.interactionCount or 1,
-            interClickDelay = wp.interClickDelay or 0.15,
-            actionHoldDuration = wp.actionHoldDuration or 0,
-            actionPromptName = wp.actionPromptName or nil,
-            actionParentName = wp.actionParentName or nil
-        })
-    end
-
-    local jsonString = HttpService:JSONEncode(exportTable)
-    writefile(name, jsonString)
-    showToast("Saved route to: " .. name)
-end
-
-loadRouteFromFile = function(fileName)
-    local name = (fileName and fileName ~= "") and fileName or Config.FileName
-    if not (readfile and isfile and isfile(name)) then
-        triggerErrorModal("ERR_FILE_NOT_FOUND", "Could not locate file '" .. name .. "' in your executor's workspace folder.")
-        return
-    end
-
-    local raw = readfile(name)
-    local success, decoded = pcall(function()
-        return HttpService:JSONDecode(raw)
+    jumpConnection = UserInputService.JumpRequest:Connect(function()
+        if isRecording then jumpTriggered = true end
     end)
 
-    if success and typeof(decoded) == "table" then
-        Waypoints = {}
-        for _, rawWp in ipairs(decoded) do
-            local restoredPromptPos = rawWp.promptPos and Vector3.new(rawWp.promptPos[1], rawWp.promptPos[2], rawWp.promptPos[3]) or nil
-
-            table.insert(Waypoints, {
-                pos = Vector3.new(rawWp.pos[1], rawWp.pos[2], rawWp.pos[3]),
-                promptPos = restoredPromptPos,
-                jump = rawWp.jump,
-                pauseDuration = rawWp.pauseDuration or 0,
-                speed = rawWp.speed or 16,
-                isSprinting = rawWp.isSprinting or false,
-                delay = rawWp.delay,
-                action = nil,
-                isInteractionNode = rawWp.isInteractionNode or false,
-                interactionCount = rawWp.interactionCount or 1,
-                interClickDelay = rawWp.interClickDelay or 0.15,
-                actionHoldDuration = rawWp.actionHoldDuration or 0,
-                actionPromptName = rawWp.actionPromptName,
-                actionParentName = rawWp.actionParentName
-            })
+    keyConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if isRecording then
+            if input.KeyCode == Enum.KeyCode.E then
+                holdStartTick = tick()
+            elseif Config.RecordMouseClicks and input.UserInputType == Enum.UserInputType.MouseButton1 then
+                mb1StartTick = tick()
+            end
         end
-        renderVisualPath(Waypoints)
-        currentLoopCount = 0
-        updateTelemetry(nil, #Waypoints)
-        showToast(string.format("Loaded %d waypoints from %s", #Waypoints, name))
-    else
-        triggerErrorModal("ERR_JSON_PARSE", "Failed to deserialize route data. The JSON formatting may be corrupted.")
+    end)
+
+    keyEndConnection = UserInputService.InputEnded:Connect(function(input)
+        if isRecording then
+            if input.KeyCode == Enum.KeyCode.E and holdStartTick then
+                local rawDuration = tick() - holdStartTick
+                local finalDuration = math.max(rawDuration, 0.2)
+                holdStartTick = nil
+
+                local pos = getEntityPosition()
+                if not pos then return end
+                local now = tick()
+                local _, _, h = getCharacter()
+                local cam = workspace.CurrentCamera
+                local aimPos = pos + (cam and (cam.CFrame.LookVector * 3.5) or Vector3.zero)
+
+                table.insert(Waypoints, {
+                    pos = pos,
+                    promptPos = aimPos,
+                    jump = false,
+                    pauseDuration = 0,
+                    speed = h and h.WalkSpeed or 16,
+                    isSprinting = h and (h.WalkSpeed > 17) or false,
+                    isInteractionNode = true,
+                    actionHoldDuration = math.floor((finalDuration + 0.25) * 10) / 10,
+                    interactionCount = 1,
+                    interClickDelay = 0.2,
+                    delay = now - lastWaypointTime
+                })
+                lastWaypointTime = now
+                updateTelemetry(nil, #Waypoints)
+                if Config.RealtimeVisualizer then renderVisualPath(Waypoints) end
+                showToast(string.format("Interaction Stamped (%.1fs)", finalDuration))
+
+            elseif Config.RecordMouseClicks and input.UserInputType == Enum.UserInputType.MouseButton1 and mb1StartTick then
+                local rawDuration = tick() - mb1StartTick
+                local finalDuration = math.max(rawDuration, 0.05)
+                mb1StartTick = nil
+                
+                local pos = getEntityPosition()
+                if not pos then return end
+                local now = tick()
+                local _, _, h = getCharacter()
+                
+                table.insert(Waypoints, {
+                    pos = pos,
+                    isMouseClick = true,
+                    clickDuration = math.floor((finalDuration) * 100) / 100,
+                    jump = false,
+                    pauseDuration = 0,
+                    speed = h and h.WalkSpeed or 16,
+                    delay = now - lastWaypointTime
+                })
+                lastWaypointTime = now
+                updateTelemetry(nil, #Waypoints)
+                if Config.RealtimeVisualizer then renderVisualPath(Waypoints) end
+                showToast(string.format("Mouse Click Stamped (%.2fs)", finalDuration))
+            end
+        end
+    end)
+    table.insert(scriptConnections, keyEndConnection)
+
+    local _, _, hum = getCharacter()
+    if hum then
+        stateConnection = hum.StateChanged:Connect(function(oldState, newState)
+            if isRecording and newState == Enum.HumanoidStateType.Jumping then
+                jumpTriggered = true
+            end
+        end)
     end
+end
+
+startRecording = function()
+    if isRecording then return end
+    if isPlaying then
+        if playToggleControl and typeof(playToggleControl.Set) == "function" then 
+            playToggleControl.Set(false, false) 
+        end
+    end
+
+    local startAttempts = 0
+    local initialPos = nil
+    while startAttempts < 30 do
+        initialPos = getEntityPosition()
+        if initialPos then break end
+        startAttempts = startAttempts + 1
+        task.wait(0.1)
+    end
+
+    if not initialPos then
+        triggerErrorModal("ERR_NO_PHYSICAL_ROOT", "Could not locate a valid physical root part on your character model.")
+        if recordToggleControl and typeof(recordToggleControl.Set) == "function" then
+            recordToggleControl.Set(false, true)
+        end
+        return
+    end
+
+    Waypoints = {}
+    clearVisuals()
+    isRecording = true
+    jumpTriggered = false
+    holdStartTick = nil
+    mb1StartTick = nil
+    currentLoopCount = 0
+    lastWaypointTime = tick()
+    lastPromptClickTime = tick()
+    updateStateBadge("REC", activeTheme.RecordActive)
+    playSoundFeedback(1.2)
+    showToast("Recording started...")
+
+    hookJumpListeners()
+
+    local _, _, hum = getCharacter()
+
+    table.insert(Waypoints, {
+        pos = initialPos,
+        jump = false,
+        pauseDuration = 0,
+        speed = hum and hum.WalkSpeed or 16,
+        isSprinting = hum and (h and h.WalkSpeed > 17) or false,
+        action = nil,
+        delay = 0.08
+    })
+    updateTelemetry(nil, #Waypoints)
+    if Config.RealtimeVisualizer then
+        renderVisualPath(Waypoints)
+    end
+
+    task.spawn(function()
+        local lastRecordedPos = initialPos
+        local standingStillTime = 0
+
+        while isRecording do
+            local pos = getEntityPosition()
+            if pos then
+                local _, _, h = getCharacter()
+                local distMoved = (pos - lastRecordedPos).Magnitude
+                local now = tick()
+                local stampedJump = jumpTriggered
+                jumpTriggered = false
+
+                if distMoved > 0.4 or stampedJump then
+                    standingStillTime = 0
+                    table.insert(Waypoints, {
+                        pos = pos,
+                        jump = stampedJump,
+                        pauseDuration = 0,
+                        speed = h and h.WalkSpeed or 16,
+                        isSprinting = h and (h.WalkSpeed > 17) or false,
+                        delay = now - lastWaypointTime
+                    })
+                    lastRecordedPos = pos
+                    lastWaypointTime = now
+                    updateTelemetry(nil, #Waypoints)
+                    if Config.RealtimeVisualizer then renderVisualPath(Waypoints) end
+                else
+                    standingStillTime = standingStillTime + 0.08
+                    if #Waypoints > 0 and standingStillTime > 0.6 then
+                        Waypoints[#Waypoints].pauseDuration = math.floor(standingStillTime * 10) / 10
+                    end
+                end
+            end
+            task.wait(0.08)
+        end
+    end)
 end
 
 -- Auto-Execute on Rejoin
@@ -2979,4 +2721,4 @@ _G.Autofarm_Control = {
     Keybinds = Keybinds
 }
 
-print("🚀 Autofarm V12.4 (Hardware Bridge & Interaction Suite) Loaded.")
+print("🚀 Autofarm V12.5 (Surgical Precision Patch) Loaded.")
