@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V14.4 - MASTER HEAP ARCHITECTURE (ANTI-NIL BUG)
+--  MANNISKAFARM V14.5 - MASTER HEAP ARCHITECTURE & AUTO-REVEAL
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -93,7 +93,7 @@ local loadCorner = Instance.new("UICorner"); loadCorner.CornerRadius = UDim.new(
 local loadStroke = Instance.new("UIStroke"); loadStroke.Thickness = 1.5; loadStroke.Color = Color3.fromRGB(0, 162, 255); loadStroke.Parent = loadFrame
 
 local loadTitle = Instance.new("TextLabel")
-loadTitle.Size = UDim2.new(1, 0, 0, 30); loadTitle.Position = UDim2.new(0, 0, 0, 15); loadTitle.BackgroundTransparency = 1; loadTitle.Text = "MANNISKAFARM V14.4"; loadTitle.TextColor3 = Color3.fromRGB(245, 245, 245); loadTitle.TextSize = 16; loadTitle.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold); loadTitle.Parent = loadFrame
+loadTitle.Size = UDim2.new(1, 0, 0, 30); loadTitle.Position = UDim2.new(0, 0, 0, 15); loadTitle.BackgroundTransparency = 1; loadTitle.Text = "MANNISKAFARM V14.5"; loadTitle.TextColor3 = Color3.fromRGB(245, 245, 245); loadTitle.TextSize = 16; loadTitle.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold); loadTitle.Parent = loadFrame
 
 local loadStatus = Instance.new("TextLabel")
 loadStatus.Size = UDim2.new(1, 0, 0, 20); loadStatus.Position = UDim2.new(0, 0, 0, 45); loadStatus.BackgroundTransparency = 1; loadStatus.Text = "Initializing Engine..."; loadStatus.TextColor3 = Color3.fromRGB(150, 160, 180); loadStatus.TextSize = 11; loadStatus.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium); loadStatus.Parent = loadFrame
@@ -391,7 +391,7 @@ Core.hookInputListeners = function()
                 Core.lastWaypointTime = now
                 Core.updateTelemetry(nil, #Core.Waypoints)
                 if Core.Config.RealtimeVisualizer then Core.renderVisualPath(Core.Waypoints) end
-                if Core.showToast then Core.showToast(string.format("Interaction Stamped (%.1fs)", finalDuration)) end
+                if Core.UI.showToast then Core.UI.showToast(string.format("Interaction Stamped (%.1fs)", finalDuration)) end
                 
             elseif Core.Config.RecordMouseClicks and input.UserInputType == Enum.UserInputType.MouseButton1 and Core.mb1StartTick then
                 local rawDuration = tick() - Core.mb1StartTick
@@ -410,7 +410,7 @@ Core.hookInputListeners = function()
                 Core.lastWaypointTime = now
                 Core.updateTelemetry(nil, #Core.Waypoints)
                 if Core.Config.RealtimeVisualizer then Core.renderVisualPath(Core.Waypoints) end
-                if Core.showToast then Core.showToast(string.format("Mouse Click Stamped (%.2fs)", finalDuration)) end
+                if Core.UI.showToast then Core.UI.showToast(string.format("Mouse Click Stamped (%.2fs)", finalDuration)) end
             end
         end
     end)
@@ -423,7 +423,7 @@ Core.hookInputListeners = function()
     end
 end
 
-Core.updateLoad("Preparing Playback Handlers...", 0.65)
+Core.updateLoad("Preparing Playback Handlers...", 0.75)
 
 Core.stopRecording = function()
     Core.isRecording = false
@@ -437,11 +437,11 @@ Core.stopRecording = function()
     if Core.UI.recordToggleControl and typeof(Core.UI.recordToggleControl.Get) == "function" and Core.UI.recordToggleControl.Get() then
         Core.UI.recordToggleControl.Set(false, true)
     end
-    if Core.updateStateBadge then Core.updateStateBadge("IDLE", Color3.fromRGB(60, 65, 80)) end
+    if Core.UI.updateStateBadge then Core.UI.updateStateBadge("IDLE", Color3.fromRGB(60, 65, 80)) end
     Core.renderVisualPath(Core.Waypoints)
     Core.updateTelemetry(nil, #Core.Waypoints)
     Core.playSoundFeedback(0.9)
-    if Core.showToast then Core.showToast(string.format("Recording stopped (%d nodes)", #Core.Waypoints)) end
+    if Core.UI.showToast then Core.UI.showToast(string.format("Recording stopped (%d nodes)", #Core.Waypoints)) end
 end
 
 Core.startRecording = function()
@@ -458,7 +458,7 @@ Core.startRecording = function()
     end
 
     if not initialPos then
-        if Core.triggerErrorModal then Core.triggerErrorModal("ERR_NO_PHYSICAL_ROOT", "Could not locate a valid physical root part on your character model.") end
+        if Core.UI.triggerErrorModal then Core.UI.triggerErrorModal("ERR_NO_PHYSICAL_ROOT", "Could not locate a valid physical root part on your character model.") end
         if Core.UI.recordToggleControl and typeof(Core.UI.recordToggleControl.Set) == "function" then Core.UI.recordToggleControl.Set(false, true) end
         return
     end
@@ -471,9 +471,9 @@ Core.startRecording = function()
     Core.mb1StartTick = nil
     Core.currentLoopCount = 0
     Core.lastWaypointTime = tick()
-    if Core.updateStateBadge then Core.updateStateBadge("REC", Core.activeTheme.RecordActive) end
+    if Core.UI.updateStateBadge then Core.UI.updateStateBadge("REC", Core.activeTheme.RecordActive) end
     Core.playSoundFeedback(1.2)
-    if Core.showToast then Core.showToast("Recording started...") end
+    if Core.UI.showToast then Core.UI.showToast("Recording started...") end
 
     Core.hookInputListeners()
     local _, _, hum = Core.getCharacter()
@@ -526,9 +526,9 @@ Core.stopPlayback = function()
     if Core.UI.playToggleControl and typeof(Core.UI.playToggleControl.Get) == "function" and Core.UI.playToggleControl.Get() then
         Core.UI.playToggleControl.Set(false, true)
     end
-    if Core.updateStateBadge then Core.updateStateBadge("IDLE", Color3.fromRGB(60, 65, 80)) end
+    if Core.UI.updateStateBadge then Core.UI.updateStateBadge("IDLE", Color3.fromRGB(60, 65, 80)) end
     Core.updateTelemetry(nil, #Core.Waypoints)
-    if Core.showToast then Core.showToast("Playback stopped.") end
+    if Core.UI.showToast then Core.UI.showToast("Playback stopped.") end
 end
 
 Core.resolveAndTriggerPrompt = function(data, root)
@@ -627,11 +627,11 @@ Core.checkPlayerProximityRadar = function(root)
                 local dist = (otherRoot.Position - rootPos).Magnitude
                 if dist <= Core.Config.RadarRadius then
                     if Core.Config.RadarAction == "ServerHop" then
-                        if Core.showToast then Core.showToast("Radar Alert: Player detected! Server hopping...") end
+                        if Core.UI.showToast then Core.UI.showToast("Radar Alert: Player detected! Server hopping...") end
                         task.spawn(function() TeleportService:Teleport(game.PlaceId, player) end)
                         return true
                     else
-                        if Core.showToast then Core.showToast("Radar Alert: Player nearby. Pausing...") end
+                        if Core.UI.showToast then Core.UI.showToast("Radar Alert: Player nearby. Pausing...") end
                         return true
                     end
                 end
@@ -649,16 +649,16 @@ Core.startPlayback = function()
 
     local _, root, _ = Core.getCharacter()
     if not root then
-        if Core.triggerErrorModal then Core.triggerErrorModal("ERR_PLAYBACK_STALL", "Cannot start playback: No character root part found.") end
+        if Core.UI.triggerErrorModal then Core.UI.triggerErrorModal("ERR_PLAYBACK_STALL", "Cannot start playback: No character root part found.") end
         if Core.UI.playToggleControl and typeof(Core.UI.playToggleControl.Set) == "function" then Core.UI.playToggleControl.Set(false, true) end
         return
     end
 
     Core.isPlaying = true
     Core.currentLoopCount = 0
-    if Core.updateStateBadge then Core.updateStateBadge("PLAY", Core.activeTheme.PlayActive) end
+    if Core.UI.updateStateBadge then Core.UI.updateStateBadge("PLAY", Core.activeTheme.PlayActive) end
     Core.playSoundFeedback(1.2)
-    if Core.showToast then Core.showToast("Playback started: " .. Core.Config.PlaybackMode) end
+    if Core.UI.showToast then Core.UI.showToast("Playback started: " .. Core.Config.PlaybackMode) end
 
     task.spawn(function()
         local directionForward = (Core.Config.PlaybackMode ~= "Reverse")
@@ -799,7 +799,7 @@ Core.startPlayback = function()
             Core.playSoundFeedback(1.5)
 
             if Core.Config.TargetLoops > 0 and Core.currentLoopCount >= Core.Config.TargetLoops then
-                if Core.showToast then Core.showToast(string.format("Completed %d loop(s). Stopping.", Core.Config.TargetLoops)) end
+                if Core.UI.showToast then Core.UI.showToast(string.format("Completed %d loop(s). Stopping.", Core.Config.TargetLoops)) end
                 break
             end
 
@@ -815,10 +815,10 @@ Core.undoLastNode = function()
         table.remove(Core.Waypoints)
         Core.renderVisualPath(Core.Waypoints)
         Core.updateTelemetry(nil, #Core.Waypoints)
-        if Core.showToast then Core.showToast(string.format("Undid node #%d", #Core.Waypoints + 1)) end
+        if Core.UI.showToast then Core.UI.showToast(string.format("Undid node #%d", #Core.Waypoints + 1)) end
         Core.playSoundFeedback(0.8)
     else
-        if Core.showToast then Core.showToast("No nodes to undo.") end
+        if Core.UI.showToast then Core.UI.showToast("No nodes to undo.") end
     end
 end
 
@@ -827,11 +827,11 @@ Core.clearWaypoints = function()
     Core.clearVisuals()
     Core.currentLoopCount = 0
     Core.updateTelemetry(nil, 0)
-    if Core.showToast then Core.showToast("Route waypoints cleared.") end
+    if Core.UI.showToast then Core.UI.showToast("Route waypoints cleared.") end
 end
 
 Core.copyRouteToClipboard = function()
-    if #Core.Waypoints == 0 then if Core.showToast then Core.showToast("No route data to export.") end return end
+    if #Core.Waypoints == 0 then if Core.UI.showToast then Core.UI.showToast("No route data to export.") end return end
     local exportTable = {}
     for _, wp in ipairs(Core.Waypoints) do
         table.insert(exportTable, {
@@ -842,13 +842,13 @@ Core.copyRouteToClipboard = function()
         })
     end
     local jsonString = HttpService:JSONEncode(exportTable)
-    if setclipboard then setclipboard(jsonString); if Core.showToast then Core.showToast("Route JSON copied to clipboard!") end
-    else if Core.showToast then Core.showToast("Clipboard API unavailable.") end end
+    if setclipboard then setclipboard(jsonString); if Core.UI.showToast then Core.UI.showToast("Route JSON copied to clipboard!") end
+    else if Core.UI.showToast then Core.UI.showToast("Clipboard API unavailable.") end end
 end
 
 Core.saveRouteToFile = function(fileName)
     local name = (fileName and fileName ~= "") and fileName or Core.Config.FileName
-    if not (writefile and isfile) then if Core.triggerErrorModal then Core.triggerErrorModal("ERR_STORAGE_WRITE", "Your executor does not support the 'writefile' API.") end return end
+    if not (writefile and isfile) then if Core.UI.triggerErrorModal then Core.UI.triggerErrorModal("ERR_STORAGE_WRITE", "Your executor does not support the 'writefile' API.") end return end
     local exportTable = {}
     for _, wp in ipairs(Core.Waypoints) do
         table.insert(exportTable, {
@@ -859,12 +859,12 @@ Core.saveRouteToFile = function(fileName)
         })
     end
     writefile(name, HttpService:JSONEncode(exportTable))
-    if Core.showToast then Core.showToast("Saved route to: " .. name) end
+    if Core.UI.showToast then Core.UI.showToast("Saved route to: " .. name) end
 end
 
 Core.loadRouteFromFile = function(fileName)
     local name = (fileName and fileName ~= "") and fileName or Core.Config.FileName
-    if not (readfile and isfile and isfile(name)) then if Core.triggerErrorModal then Core.triggerErrorModal("ERR_FILE_NOT_FOUND", "Could not locate file '" .. name .. "'") end return end
+    if not (readfile and isfile and isfile(name)) then if Core.UI.triggerErrorModal then Core.UI.triggerErrorModal("ERR_FILE_NOT_FOUND", "Could not locate file '" .. name .. "'") end return end
     local success, decoded = pcall(function() return HttpService:JSONDecode(readfile(name)) end)
     if success and typeof(decoded) == "table" then
         Core.Waypoints = {}
@@ -877,8 +877,8 @@ Core.loadRouteFromFile = function(fileName)
             })
         end
         Core.renderVisualPath(Core.Waypoints); Core.currentLoopCount = 0; Core.updateTelemetry(nil, #Core.Waypoints)
-        if Core.showToast then Core.showToast(string.format("Loaded %d waypoints from %s", #Core.Waypoints, name)) end
-    else if Core.triggerErrorModal then Core.triggerErrorModal("ERR_JSON_PARSE", "Failed to deserialize route data. The JSON formatting may be corrupted.") end end
+        if Core.UI.showToast then Core.UI.showToast(string.format("Loaded %d waypoints from %s", #Core.Waypoints, name)) end
+    else if Core.UI.triggerErrorModal then Core.UI.triggerErrorModal("ERR_JSON_PARSE", "Failed to deserialize route data. The JSON formatting may be corrupted.") end end
 end
 
 Core.terminateProcess = function()
@@ -893,7 +893,7 @@ Core.terminateProcess = function()
     if screenGui then screenGui:Destroy() end
 end
 
-Core.updateLoad("Constructing User Interface...", 0.8)
+Core.updateLoad("Constructing User Interface...", 0.9)
 
 -- =====================================================================
 --  UI CONSTRUCTION (BOTTOM-LOADED TO FIX EXECUTOR CLOSURES)
@@ -940,7 +940,7 @@ errDismissBtn.Size = UDim2.new(1, -28, 0, 26); errDismissBtn.Position = UDim2.ne
 local errBtnCorner = Instance.new("UICorner"); errBtnCorner.CornerRadius = UDim.new(0, 6); errBtnCorner.Parent = errDismissBtn
 errDismissBtn.MouseButton1Click:Connect(function() Core.UI.errorModal.Visible = false end)
 
-Core.triggerErrorModal = function(errorCode, description)
+Core.UI.triggerErrorModal = function(errorCode, description)
     Core.UI.errCodeLabel.Text = "CODE: " .. tostring(errorCode)
     Core.UI.errDesc.Text = tostring(description)
     Core.UI.errorModal.Visible = true
@@ -1015,7 +1015,7 @@ local stateBadgeLabel = Instance.new("TextLabel")
 stateBadgeLabel.Size = UDim2.new(1, 0, 1, 0); stateBadgeLabel.BackgroundTransparency = 1; stateBadgeLabel.Text = "IDLE"; stateBadgeLabel.TextColor3 = Color3.fromRGB(220, 225, 235); stateBadgeLabel.TextSize = 9; stateBadgeLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold); stateBadgeLabel.Parent = stateBadge
 Core.UI.stateBadgeLabel = stateBadgeLabel
 
-Core.updateStateBadge = function(stateName, color)
+Core.UI.updateStateBadge = function(stateName, color)
     Core.UI.stateBadgeLabel.Text = stateName
     Core.UI.hudBadgeLabel.Text = stateName
     TweenService:Create(Core.UI.stateBadge, TWEEN_QUICK, { BackgroundColor3 = color }):Play()
@@ -1052,8 +1052,8 @@ minBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-local isGuiOpen = true
-local function setGuiVisible(visible)
+local isGuiOpen = false
+Core.UI.setGuiVisible = function(visible)
     isGuiOpen = visible
     if visible then
         mainFrame.Visible = true; mainFrame.BackgroundTransparency = 1
@@ -1064,7 +1064,7 @@ local function setGuiVisible(visible)
         closeTween.Completed:Connect(function() if not isGuiOpen then mainFrame.Visible = false end end)
     end
 end
-closeBtn.MouseButton1Click:Connect(function() setGuiVisible(false) end)
+closeBtn.MouseButton1Click:Connect(function() Core.UI.setGuiVisible(false) end)
 
 local progressTrack = Instance.new("Frame")
 progressTrack.Size = UDim2.new(1, 0, 0, 2); progressTrack.Position = UDim2.new(0, 0, 0, 48); progressTrack.BackgroundColor3 = Core.activeTheme.Border; progressTrack.BorderSizePixel = 0; progressTrack.Parent = mainFrame
@@ -1088,15 +1088,16 @@ Core.UI.toastLabel = toastLabel
 Core.registerElement("TextPrimary", toastLabel, "TextColor3")
 
 Core.showToast = function(message)
-    Core.UI.toastLabel.Text = message
-    Core.toastSerial = Core.toastSerial + 1
-    local mySerial = Core.toastSerial
+    Core.UI.toastLabel.Text = message; Core.toastSerial = Core.toastSerial + 1; local mySerial = Core.toastSerial
     task.spawn(function()
         TweenService:Create(Core.UI.toastFrame, TWEEN_BOUNCE, { Position = UDim2.new(0, 14, 1, -44) }):Play()
         task.wait(2.2)
         if Core.toastSerial == mySerial then TweenService:Create(Core.UI.toastFrame, TWEEN_QUICK, { Position = UDim2.new(0, 14, 1, 40) }):Play() end
     end)
 end
+Core.UI.showToast = Core.showToast
+Core.UI.triggerErrorModal = Core.triggerErrorModal
+Core.UI.updateStateBadge = Core.updateStateBadge
 
 local tabContainer = Instance.new("Frame")
 tabContainer.Size = UDim2.new(1, 0, 0, 36); tabContainer.Position = UDim2.new(0, 0, 0, 50); tabContainer.BackgroundColor3 = Core.activeTheme.Surface; tabContainer.BackgroundTransparency = 0.6; tabContainer.BorderSizePixel = 0; tabContainer.Parent = mainFrame
@@ -1382,7 +1383,7 @@ Core.createSliderRow(settingsPage, "LoopSlider", "Loop Count Limit", 0, 200, Cor
 Core.createSliderRow(settingsPage, "SpeedSlider", "Playback Speed", 0.5, 3.0, Core.Config.SpeedMultiplier, "%.2fx", function(val) Core.Config.SpeedMultiplier = math.floor(val * 100) / 100; Core.updateTelemetry(nil, #Core.Waypoints) end, 4)
 
 Core.createSectionHeader(settingsPage, "Hardware Bridge & Integration", 5)
-Core.createToggleRow(settingsPage, "BridgeToggle", "External Macro Bridge (.NET)", Core.activeTheme.PlayActive, function(state) Core.Config.UseExternalBridge = state; Core.showToast("Hardware Bridge: " .. (state and "Enabled" or "Disabled")) end, 6, Core.Config.UseExternalBridge)
+Core.createToggleRow(settingsPage, "BridgeToggle", "External Macro Bridge (.NET)", Core.activeTheme.PlayActive, function(state) Core.Config.UseExternalBridge = state; Core.UI.showToast("Hardware Bridge: " .. (state and "Enabled" or "Disabled")) end, 6, Core.Config.UseExternalBridge)
 
 Core.createSectionHeader(settingsPage, "Display & Visualizer", 7)
 Core.createToggleRow(settingsPage, "StatusHUDToggle", "Persistent Status Bar (Draggable)", Core.activeTheme.Accent, function(state) Core.Config.StatusHUDEnabled = state; Core.UI.statusHUD.Visible = state end, 8, Core.Config.StatusHUDEnabled)
@@ -1431,14 +1432,14 @@ local inputConnection = UserInputService.InputBegan:Connect(function(input, game
         if Core.activeBindingKey == "ToggleRecord" then bindRec.Button.Text = input.KeyCode.Name; bindRec.Button.TextColor3 = Core.activeTheme.TextPrimary end
         if Core.activeBindingKey == "TogglePlay" then bindPlay.Button.Text = input.KeyCode.Name; bindPlay.Button.TextColor3 = Core.activeTheme.TextPrimary end
         if Core.activeBindingKey == "UndoNode" then bindUndo.Button.Text = input.KeyCode.Name; bindUndo.Button.TextColor3 = Core.activeTheme.TextPrimary end
-        Core.showToast(string.format("%s set to: %s", Core.activeBindingKey, input.KeyCode.Name))
+        Core.UI.showToast(string.format("%s set to: %s", Core.activeBindingKey, input.KeyCode.Name))
         Core.activeBindingKey = nil
         return
     end
 
     if not gameProcessed and input.UserInputType == Enum.UserInputType.Keyboard then
         if input.KeyCode == Core.Keybinds.ToggleMenu then 
-            if Core.UI.mainFrame then setGuiVisible(not Core.UI.mainFrame.Visible) end
+            if Core.UI.mainFrame then Core.UI.setGuiVisible(not Core.UI.mainFrame.Visible) end
         elseif input.KeyCode == Core.Keybinds.ToggleRecord then if Core.UI.recordToggleControl and typeof(Core.UI.recordToggleControl.Get) == "function" then Core.UI.recordToggleControl.Set(not Core.UI.recordToggleControl.Get()) end
         elseif input.KeyCode == Core.Keybinds.TogglePlay then if Core.UI.playToggleControl and typeof(Core.UI.playToggleControl.Get) == "function" then Core.UI.playToggleControl.Set(not Core.UI.playToggleControl.Get()) end
         elseif input.KeyCode == Core.Keybinds.UndoNode then Core.undoLastNode() end
@@ -1469,7 +1470,7 @@ Core.applyTheme = function(themeName, customPalette)
     end
 
     for _, t in ipairs(Core.activeToggles) do t.UpdateTheme() end
-    Core.showToast("Theme: " .. themeName)
+    Core.UI.showToast("Theme: " .. themeName)
 end
 
 local themeOrder = { "Midnight Blue", "Dark Charcoal" }
@@ -1557,6 +1558,9 @@ local dragChangeConn = UserInputService.InputChanged:Connect(function(input)
 end)
 table.insert(Core.scriptConnections, dragChangeConn)
 
+-- =====================================================================
+--  FINAL BOOT & GLOBALS
+-- =====================================================================
 _G.Autofarm_Control = {
     ToggleRecord = function(state) if state then Core.startRecording() else Core.stopRecording() end end,
     TogglePlay = function(state) if state then Core.startPlayback() else Core.stopPlayback() end end,
@@ -1577,7 +1581,7 @@ task.spawn(function()
             Core.loadRouteFromFile(dec.Route)
             task.wait(1.0)
             if Core.UI.playToggleControl and typeof(Core.UI.playToggleControl.Set) == "function" then Core.UI.playToggleControl.Set(true, false) else Core.startPlayback() end
-            Core.showToast("Auto-Rejoin: Resumed route " .. dec.Route)
+            if Core.UI.showToast then Core.UI.showToast("Auto-Rejoin: Resumed route " .. dec.Route) end
         end
     end
 end)
@@ -1590,6 +1594,10 @@ TweenService:Create(loadStatus, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.E
 TweenService:Create(loadBarBg, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { BackgroundTransparency = 1 }):Play()
 TweenService:Create(loadBarFill, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { BackgroundTransparency = 1 }):Play()
 TweenService:Create(loadStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Transparency = 1 }):Play()
-task.delay(0.5, function() loadGui:Destroy() end)
+
+task.delay(0.5, function() 
+    loadGui:Destroy() 
+    if Core.UI.setGuiVisible then Core.UI.setGuiVisible(true) end
+end)
 
 print("🚀 Autofarm V14.4 (Full Heap Architecture) Loaded.")
