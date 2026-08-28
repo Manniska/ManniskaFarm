@@ -1568,6 +1568,7 @@ do
     table.insert(scriptConnections, dragChangeConn)
 end
 
+local currentLoopCount = 0 -- ADD THIS LINE HERE
 updateTelemetry = function(currentNode, totalNodes)
     totalNodes = totalNodes or 0
     local loopTargetStr = (Config.TargetLoops == 0) and "Inf" or tostring(Config.TargetLoops)
