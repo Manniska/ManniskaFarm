@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V12.5 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V12.6 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -300,10 +300,18 @@ local errorModal, statusHUD, hudBadgeLabel, hudNodeLabel, hudLoopLabel, hudBadge
 -- Global Control Forward References
 local startRecording, stopRecording, startPlayback, stopPlayback, clearWaypoints, undoLastNode, saveRouteToFile, loadRouteFromFile, copyRouteToClipboard, terminateProcess
 
--- Visualizer Setup
+-- Visualizer Setup & Object Pooling (LAG FIX)
 local visualizerFolder = workspace:FindFirstChild("ManniskaPathVisualizer") or Instance.new("Folder")
 visualizerFolder.Name = "ManniskaPathVisualizer"
 visualizerFolder.Parent = workspace
+
+local visualizerAnchor = workspace:FindFirstChild("ManniskaVisAnchor") or Instance.new("Part")
+visualizerAnchor.Name = "ManniskaVisAnchor"
+visualizerAnchor.Anchored = true
+visualizerAnchor.CanCollide = false
+visualizerAnchor.Transparency = 1
+visualizerAnchor.Position = Vector3.zero
+visualizerAnchor.Parent = workspace
 
 local activeNodeHalo = Instance.new("Part")
 activeNodeHalo.Name = "ActiveTargetHalo"
@@ -317,12 +325,56 @@ activeNodeHalo.Transparency = 1
 activeNodeHalo.CastShadow = false
 activeNodeHalo.Parent = visualizerFolder
 
+local visualizerPool = { Nodes = {}, Beams = {}, Labels = {} }
+
+local function getVisNode(idx)
+    if visualizerPool.Nodes[idx] then return visualizerPool.Nodes[idx] end
+    local sphere = Instance.new("SphereHandleAdornment")
+    sphere.Adornee = visualizerAnchor
+    sphere.ZIndex = 1
+    sphere.AlwaysOnTop = false
+    sphere.Parent = visualizerFolder
+    visualizerPool.Nodes[idx] = sphere
+    return sphere
+end
+
+local function getVisBeam(idx)
+    if visualizerPool.Beams[idx] then return visualizerPool.Beams[idx] end
+    local line = Instance.new("LineHandleAdornment")
+    line.Adornee = visualizerAnchor
+    line.Thickness = 4
+    line.ZIndex = 0
+    line.AlwaysOnTop = false
+    line.Parent = visualizerFolder
+    visualizerPool.Beams[idx] = line
+    return line
+end
+
+local function getVisLabel(idx)
+    if visualizerPool.Labels[idx] then return visualizerPool.Labels[idx] end
+    local attach = Instance.new("Attachment")
+    attach.Parent = visualizerAnchor
+    local billboard = Instance.new("BillboardGui")
+    billboard.Adornee = attach
+    billboard.Size = UDim2.new(0, 48, 0, 18)
+    billboard.StudsOffset = Vector3.new(0, 1.2, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = visualizerFolder
+    local tag = Instance.new("TextLabel")
+    tag.Size = UDim2.new(1, 0, 1, 0)
+    tag.BackgroundTransparency = 1
+    tag.TextSize = 10
+    tag.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+    tag.Parent = billboard
+    local lblObj = { Billboard = billboard, Tag = tag, Attach = attach }
+    visualizerPool.Labels[idx] = lblObj
+    return lblObj
+end
+
 clearVisuals = function()
-    for _, child in ipairs(visualizerFolder:GetChildren()) do
-        if child ~= activeNodeHalo then
-            child:Destroy()
-        end
-    end
+    for _, node in ipairs(visualizerPool.Nodes) do node.Visible = false end
+    for _, beam in ipairs(visualizerPool.Beams) do beam.Visible = false end
+    for _, lbl in ipairs(visualizerPool.Labels) do lbl.Billboard.Enabled = false end
     activeNodeHalo.Transparency = 1
 end
 
@@ -592,7 +644,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V12.5"
+    titleLabel.Text = "MANNISKAFARM V12.6"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -2041,86 +2093,43 @@ renderVisualPath = function(waypointsList)
     clearVisuals()
     if not Config.VisualizerEnabled or #waypointsList == 0 then return end
 
-    local prevNode = nil
+    local prevPos = nil
     for i, data in ipairs(waypointsList) do
-        local node = Instance.new("Part")
-        node.Name = "Node_" .. i
-        node.Shape = Enum.PartType.Ball
-        node.Size = (i == 1 or i == #waypointsList) and Vector3.new(1.1, 1.1, 1.1) or Vector3.new(0.7, 0.7, 0.7)
-        node.Position = data.pos
-        node.Anchored = true
-        node.CanCollide = false
-        node.Material = Enum.Material.Neon
+        local node = getVisNode(i)
+        node.CFrame = CFrame.new(data.pos)
+        node.Radius = (i == 1 or i == #waypointsList) and 0.55 or 0.35
         node.Transparency = Config.VisualizerOpacity
-        node.CastShadow = false
+        node.Visible = true
 
-        if i == 1 then
-            node.Color = Color3.fromRGB(0, 255, 128)
-        elseif i == #waypointsList then
-            node.Color = Color3.fromRGB(255, 60, 60)
-        elseif data.action or data.actionPromptName or data.isInteractionNode then
-            node.Color = Color3.fromRGB(0, 170, 255)
-        elseif data.pauseDuration and data.pauseDuration > 0.5 then
-            node.Color = Color3.fromRGB(255, 215, 0)
-        elseif data.jump then
-            node.Color = Color3.fromRGB(255, 170, 0)
-        elseif data.isSprinting then
-            node.Color = Color3.fromRGB(255, 80, 180)
-        else
-            node.Color = Color3.fromRGB(50, 220, 120)
-        end
-        node.Parent = visualizerFolder
+        if i == 1 then node.Color3 = Color3.fromRGB(0, 255, 128)
+        elseif i == #waypointsList then node.Color3 = Color3.fromRGB(255, 60, 60)
+        elseif data.action or data.actionPromptName or data.isInteractionNode then node.Color3 = Color3.fromRGB(0, 170, 255)
+        elseif data.pauseDuration and data.pauseDuration > 0.5 then node.Color3 = Color3.fromRGB(255, 215, 0)
+        elseif data.jump then node.Color3 = Color3.fromRGB(255, 170, 0)
+        elseif data.isSprinting then node.Color3 = Color3.fromRGB(255, 80, 180)
+        else node.Color3 = Color3.fromRGB(50, 220, 120) end
 
         if Config.WaypointLabelsEnabled then
-            local billboard = Instance.new("BillboardGui")
-            billboard.Name = "Label"
-            billboard.Adornee = node
-            billboard.Size = UDim2.new(0, 48, 0, 18)
-            billboard.StudsOffset = Vector3.new(0, 1.2, 0)
-            billboard.AlwaysOnTop = true
-            billboard.Parent = node
-
-            local tag = Instance.new("TextLabel")
-            tag.Size = UDim2.new(1, 0, 1, 0)
-            tag.BackgroundTransparency = 1
-            if i == 1 then
-                tag.Text = "[START]"
-                tag.TextColor3 = Color3.fromRGB(0, 255, 128)
-            elseif i == #waypointsList then
-                tag.Text = "[END]"
-                tag.TextColor3 = Color3.fromRGB(255, 80, 80)
-            elseif data.action or data.actionPromptName or data.isInteractionNode then
-                tag.Text = string.format("[E %s]", data.actionHoldDuration and string.format("%.1fs", data.actionHoldDuration) or "")
-                tag.TextColor3 = Color3.fromRGB(0, 200, 255)
-            elseif data.pauseDuration and data.pauseDuration > 0.5 then
-                tag.Text = string.format("[%.1fs]", data.pauseDuration)
-                tag.TextColor3 = Color3.fromRGB(255, 215, 0)
-            else
-                tag.Text = tostring(i)
-                tag.TextColor3 = Color3.fromRGB(255, 255, 255)
-            end
-            tag.TextSize = 10
-            tag.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
-            tag.Parent = billboard
+            local lblObj = getVisLabel(i)
+            lblObj.Attach.WorldPosition = data.pos
+            lblObj.Billboard.Enabled = true
+            
+            if i == 1 then lblObj.Tag.Text = "[START]"; lblObj.Tag.TextColor3 = Color3.fromRGB(0, 255, 128)
+            elseif i == #waypointsList then lblObj.Tag.Text = "[END]"; lblObj.Tag.TextColor3 = Color3.fromRGB(255, 80, 80)
+            elseif data.action or data.actionPromptName or data.isInteractionNode then lblObj.Tag.Text = string.format("[E %.1fs]", data.actionHoldDuration or 0); lblObj.Tag.TextColor3 = Color3.fromRGB(0, 200, 255)
+            elseif data.pauseDuration and data.pauseDuration > 0.5 then lblObj.Tag.Text = string.format("[%.1fs]", data.pauseDuration); lblObj.Tag.TextColor3 = Color3.fromRGB(255, 215, 0)
+            else lblObj.Tag.Text = tostring(i); lblObj.Tag.TextColor3 = Color3.fromRGB(255, 255, 255) end
         end
 
-        if prevNode then
-            local beam = Instance.new("Part")
-            beam.Anchored = true
-            beam.CanCollide = false
-            beam.Material = Enum.Material.Neon
-            beam.Color = Color3.fromRGB(120, 120, 140)
+        if prevPos then
+            local beam = getVisBeam(i)
+            beam.CFrame = CFrame.lookAt(prevPos, data.pos)
+            beam.Length = (data.pos - prevPos).Magnitude
+            beam.Color3 = Color3.fromRGB(120, 120, 140)
             beam.Transparency = math.clamp(Config.VisualizerOpacity + 0.3, 0, 0.9)
-            beam.CastShadow = false
-
-            local distance = (data.pos - prevNode.Position).Magnitude
-            if distance > 0.1 then
-                beam.Size = Vector3.new(0.12, 0.12, distance)
-                beam.CFrame = CFrame.lookAt(prevNode.Position, data.pos) * CFrame.new(0, 0, -distance / 2)
-                beam.Parent = visualizerFolder
-            end
+            beam.Visible = true
         end
-        prevNode = node
+        prevPos = data.pos
     end
 end
 
@@ -2967,4 +2976,4 @@ _G.Autofarm_Control = {
     Keybinds = Keybinds
 }
 
-print("🚀 Autofarm V12.5 (Hardware Bridge & Interaction Suite) Loaded.")
+print("🚀 Autofarm V12.6 (Hardware Bridge & Interaction Suite) Loaded.")
