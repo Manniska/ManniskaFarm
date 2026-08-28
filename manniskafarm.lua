@@ -1,11 +1,12 @@
 -- =====================================================================
---  MANNISKAFARM V13.1 - KINEMATIC FARMING & MACRO BRIDGE SUITE
+--  MANNISKAFARM V13.2 - KINEMATIC FARMING & MACRO BRIDGE SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local ProximityPromptService = game:GetService("ProximityPromptService")
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local VirtualUser = game:GetService("VirtualUser")
@@ -87,17 +88,79 @@ local function setupAntiAFK()
 end
 setupAntiAFK()
 
+-- RESTORED V12.0 ROBUST CHARACTER GETTER
 local function getCharacter()
     local char = player.Character
     local camera = workspace.CurrentCamera
-    if not char or not char.Parent then char = workspace:FindFirstChild(player.Name) end
-    
-    local hum, root = nil, nil
+
+    if not char or not char.Parent then
+        char = workspace:FindFirstChild(player.Name)
+        if not char then
+            for _, obj in ipairs(workspace:GetChildren()) do
+                if obj:IsA("Model") and (obj.Name == player.Name or obj:FindFirstChild(player.Name)) then
+                    char = obj
+                    break
+                end
+            end
+        end
+    end
+
+    local hum = nil
+    local root = nil
+
     if char and typeof(char) == "Instance" then
         hum = char:FindFirstChildWhichIsA("Humanoid", true)
-        if char.PrimaryPart and char.PrimaryPart:IsA("BasePart") then root = char.PrimaryPart end
-        if not root then root = char:FindFirstChild("HumanoidRootPart", true) end
+        
+        if char.PrimaryPart and char.PrimaryPart:IsA("BasePart") then
+            root = char.PrimaryPart
+        end
+
+        if not root then
+            local candidates = {
+                "HumanoidRootPart", "Torso", "UpperTorso", "LowerTorso",
+                "RootPart", "Hitbox", "Main", "Body", "Chest", "Center",
+                "Root", "Head", "RightUpperLeg", "LeftUpperLeg"
+            }
+            for _, name in ipairs(candidates) do
+                local found = char:FindFirstChild(name, true)
+                if found and found:IsA("BasePart") then
+                    root = found
+                    break
+                end
+            end
+        end
+
+        if not root and hum and hum.SeatPart then
+            local seat = hum.SeatPart
+            if seat:IsA("BasePart") then
+                root = seat
+            elseif seat.Parent and seat.Parent:IsA("Model") and seat.Parent.PrimaryPart then
+                root = seat.Parent.PrimaryPart
+            end
+        end
+
+        if not root then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") and not part.Anchored then
+                    root = part
+                    break
+                end
+            end
+        end
     end
+
+    if not root and camera and camera.CameraSubject then
+        local subj = camera.CameraSubject
+        if subj:IsA("BasePart") then
+            root = subj
+            char = subj.Parent
+        elseif subj:IsA("Humanoid") and subj.Parent then
+            char = subj.Parent
+            hum = subj
+            root = char.PrimaryPart or char:FindFirstChildWhichIsA("BasePart", true)
+        end
+    end
+
     return char, root, hum
 end
 
@@ -408,7 +471,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V13.1"
+    titleLabel.Text = "MANNISKAFARM V13.2"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -1486,6 +1549,70 @@ do
         end)
     end
 
+    local function updateCustomThemeFromSliders()
+        local accentCol = Color3.fromHSV(CustomThemeData.Hue, CustomThemeData.Saturation, CustomThemeData.Brightness)
+        local bgCol = Color3.fromHSV(CustomThemeData.Hue, math.clamp(CustomThemeData.Saturation * 0.4, 0.1, 0.4), 0.08)
+        local surfCol = Color3.fromHSV(CustomThemeData.Hue, math.clamp(CustomThemeData.Saturation * 0.35, 0.1, 0.35), 0.12)
+        local borderCol = Color3.fromHSV(CustomThemeData.Hue, math.clamp(CustomThemeData.Saturation * 0.5, 0.2, 0.5), 0.25)
+        local gradCol = Color3.fromHSV(CustomThemeData.Hue, CustomThemeData.Saturation * 0.8, 0.3)
+
+        local customPalette = {
+            Background = bgCol,
+            Surface = surfCol,
+            Border = borderCol,
+            Accent = accentCol,
+            RecordActive = Color3.fromRGB(240, 70, 70),
+            PlayActive = Color3.fromRGB(46, 204, 113),
+            ToggleOff = Color3.fromHSV(CustomThemeData.Hue, 0.2, 0.18),
+            TextPrimary = Color3.fromRGB(245, 246, 250),
+            TextSecondary = Color3.fromRGB(150, 160, 180),
+            GradientEnabled = CustomThemeData.GradientEnabled,
+            GradientColor = gradCol
+        }
+
+        applyTheme("Custom Theme", customPalette)
+
+        if writefile then
+            local serialized = HttpService:JSONEncode(CustomThemeData)
+            writefile("ManniskaFarm_CustomTheme.json", serialized)
+        end
+    end
+
+    createSliderRow(settingsPage, "HueSlider", "Theme Accent Hue", 0.0, 1.0, CustomThemeData.Hue, "Hue: %.2f", function(val)
+        CustomThemeData.Hue = val
+        updateCustomThemeFromSliders()
+    end, 25)
+
+    createSliderRow(settingsPage, "SatSlider", "Theme Saturation", 0.0, 1.0, CustomThemeData.Saturation, "Sat: %.2f", function(val)
+        CustomThemeData.Saturation = val
+        updateCustomThemeFromSliders()
+    end, 26)
+
+    createSliderRow(settingsPage, "BrightSlider", "Theme Brightness", 0.3, 1.0, CustomThemeData.Brightness, "Light: %.2f", function(val)
+        CustomThemeData.Brightness = val
+        updateCustomThemeFromSliders()
+    end, 27)
+
+    createToggleRow(settingsPage, "CustomGradToggle", "Background Gradient Overlay", activeTheme.Accent, function(state)
+        CustomThemeData.GradientEnabled = state
+        updateCustomThemeFromSliders()
+    end, 28, CustomThemeData.GradientEnabled)
+
+    if readfile and isfile and isfile("ManniskaFarm_CustomTheme.json") then
+        pcall(function()
+            local raw = readfile("ManniskaFarm_CustomTheme.json")
+            local dec = HttpService:JSONDecode(raw)
+            if typeof(dec) == "table" and dec.Hue then
+                CustomThemeData.Hue = dec.Hue
+                CustomThemeData.Saturation = dec.Saturation
+                CustomThemeData.Brightness = dec.Brightness
+                CustomThemeData.GradientEnabled = (dec.GradientEnabled == true)
+                task.defer(updateCustomThemeFromSliders)
+            end
+        end)
+    end
+
+    -- --- ADVANCED TAB ---
     createSectionHeader(advancedPage, "Humanization & Randomization", 1)
     createToggleRow(advancedPage, "MicroRandToggle", "Micro Randomization (Human Timing)", activeTheme.Accent, function(state) Config.MicroRandomization = state end, 2, Config.MicroRandomization)
 
@@ -1568,7 +1695,7 @@ do
     table.insert(scriptConnections, dragChangeConn)
 end
 
-local currentLoopCount = 0 -- ADD THIS LINE HERE
+local currentLoopCount = 0
 updateTelemetry = function(currentNode, totalNodes)
     totalNodes = totalNodes or 0
     local loopTargetStr = (Config.TargetLoops == 0) and "Inf" or tostring(Config.TargetLoops)
@@ -1809,7 +1936,8 @@ startRecording = function()
     end
 
     local initialPos = nil
-    for _ = 1, 30 do
+    -- INCREASED TIMEOUT: Account for workspace.StreamingEnabled delays (10 seconds total)
+    for _ = 1, 100 do
         initialPos = getEntityPosition()
         if initialPos then break end
         task.wait(0.1)
@@ -2228,4 +2356,4 @@ _G.Autofarm_Control = {
     Save = saveRouteToFile, Load = loadRouteFromFile, Export = copyRouteToClipboard, Terminate = terminateProcess, Config = Config, Keybinds = Keybinds
 }
 
-print("🚀 Autofarm V13.1 (Strict Timing & Click Recorder) Loaded.")
+print("🚀 Autofarm V13.2 (Strict Timing & Robust Streaming Hook) Loaded.")
