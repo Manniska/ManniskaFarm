@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V14.2 - INVERTED ARCHITECTURE & LOADING SEQUENCE
+--  MANNISKAFARM V14.3 - INVERTED ARCHITECTURE & KINEMATIC SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -27,60 +27,36 @@ loadGui.DisplayOrder = 999
 loadGui.Parent = playerGui
 
 local loadFrame = Instance.new("Frame")
-loadFrame.Size = UDim2.new(0, 300, 0, 100)
-loadFrame.Position = UDim2.new(0.5, -150, 0.5, -50)
-loadFrame.BackgroundColor3 = Color3.fromRGB(16, 16, 20)
-loadFrame.BorderSizePixel = 0
-loadFrame.Parent = loadGui
-
-local loadCorner = Instance.new("UICorner")
-loadCorner.CornerRadius = UDim.new(0, 8)
-loadCorner.Parent = loadFrame
-
-local loadStroke = Instance.new("UIStroke")
-loadStroke.Thickness = 1.5
-loadStroke.Color = Color3.fromRGB(0, 162, 255)
-loadStroke.Parent = loadFrame
+loadFrame.Size = UDim2.new(0, 300, 0, 100); loadFrame.Position = UDim2.new(0.5, -150, 0.5, -50)
+loadFrame.BackgroundColor3 = Color3.fromRGB(16, 16, 20); loadFrame.BorderSizePixel = 0; loadFrame.Parent = loadGui
+local loadCorner = Instance.new("UICorner"); loadCorner.CornerRadius = UDim.new(0, 8); loadCorner.Parent = loadFrame
+local loadStroke = Instance.new("UIStroke"); loadStroke.Thickness = 1.5; loadStroke.Color = Color3.fromRGB(0, 162, 255); loadStroke.Parent = loadFrame
 
 local loadTitle = Instance.new("TextLabel")
-loadTitle.Size = UDim2.new(1, 0, 0, 30)
-loadTitle.Position = UDim2.new(0, 0, 0, 15)
-loadTitle.BackgroundTransparency = 1
-loadTitle.Text = "MANNISKAFARM V14.2"
-loadTitle.TextColor3 = Color3.fromRGB(245, 245, 245)
-loadTitle.TextSize = 16
-loadTitle.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
-loadTitle.Parent = loadFrame
+loadTitle.Size = UDim2.new(1, 0, 0, 30); loadTitle.Position = UDim2.new(0, 0, 0, 15)
+loadTitle.BackgroundTransparency = 1; loadTitle.Text = "MANNISKAFARM V14.3"
+loadTitle.TextColor3 = Color3.fromRGB(245, 245, 245); loadTitle.TextSize = 16
+loadTitle.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold); loadTitle.Parent = loadFrame
 
 local loadStatus = Instance.new("TextLabel")
-loadStatus.Size = UDim2.new(1, 0, 0, 20)
-loadStatus.Position = UDim2.new(0, 0, 0, 45)
-loadStatus.BackgroundTransparency = 1
-loadStatus.Text = "Initializing Engine..."
-loadStatus.TextColor3 = Color3.fromRGB(150, 160, 180)
-loadStatus.TextSize = 11
-loadStatus.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium)
-loadStatus.Parent = loadFrame
+loadStatus.Size = UDim2.new(1, 0, 0, 20); loadStatus.Position = UDim2.new(0, 0, 0, 45)
+loadStatus.BackgroundTransparency = 1; loadStatus.Text = "Initializing Engine..."
+loadStatus.TextColor3 = Color3.fromRGB(150, 160, 180); loadStatus.TextSize = 11
+loadStatus.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium); loadStatus.Parent = loadFrame
 
 local loadBarBg = Instance.new("Frame")
-loadBarBg.Size = UDim2.new(0.8, 0, 0, 4)
-loadBarBg.Position = UDim2.new(0.1, 0, 0, 75)
-loadBarBg.BackgroundColor3 = Color3.fromRGB(30, 35, 45)
-loadBarBg.BorderSizePixel = 0
-loadBarBg.Parent = loadFrame
+loadBarBg.Size = UDim2.new(0.8, 0, 0, 4); loadBarBg.Position = UDim2.new(0.1, 0, 0, 75)
+loadBarBg.BackgroundColor3 = Color3.fromRGB(30, 35, 45); loadBarBg.BorderSizePixel = 0; loadBarBg.Parent = loadFrame
 local loadBarCorner = Instance.new("UICorner"); loadBarCorner.CornerRadius = UDim.new(1, 0); loadBarCorner.Parent = loadBarBg
 
 local loadBarFill = Instance.new("Frame")
-loadBarFill.Size = UDim2.new(0, 0, 1, 0)
-loadBarFill.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
-loadBarFill.BorderSizePixel = 0
-loadBarFill.Parent = loadBarBg
+loadBarFill.Size = UDim2.new(0, 0, 1, 0); loadBarFill.BackgroundColor3 = Color3.fromRGB(0, 162, 255); loadBarFill.BorderSizePixel = 0; loadBarFill.Parent = loadBarBg
 local loadFillCorner = Instance.new("UICorner"); loadFillCorner.CornerRadius = UDim.new(1, 0); loadFillCorner.Parent = loadBarFill
 
 local function updateLoad(text, progress)
     loadStatus.Text = text
     TweenService:Create(loadBarFill, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), { Size = UDim2.new(progress, 0, 1, 0) }):Play()
-    task.wait(0.15)
+    task.wait(0.1)
 end
 
 updateLoad("Preparing Environment...", 0.1)
@@ -90,21 +66,12 @@ updateLoad("Preparing Environment...", 0.1)
 -- =====================================================================
 local THEMES = {
     ["Midnight Blue"] = {
-        Background = Color3.fromRGB(14, 16, 22), Surface = Color3.fromRGB(22, 26, 36),
-        Border = Color3.fromRGB(42, 50, 70), Accent = Color3.fromRGB(0, 162, 255),
-        RecordActive = Color3.fromRGB(240, 70, 70), PlayActive = Color3.fromRGB(46, 204, 113),
-        ToggleOff = Color3.fromRGB(32, 38, 52), TextPrimary = Color3.fromRGB(245, 246, 250),
-        TextSecondary = Color3.fromRGB(140, 148, 170), GradientEnabled = true, GradientColor = Color3.fromRGB(0, 80, 160)
+        Background = Color3.fromRGB(14, 16, 22), Surface = Color3.fromRGB(22, 26, 36), Border = Color3.fromRGB(42, 50, 70), Accent = Color3.fromRGB(0, 162, 255), RecordActive = Color3.fromRGB(240, 70, 70), PlayActive = Color3.fromRGB(46, 204, 113), ToggleOff = Color3.fromRGB(32, 38, 52), TextPrimary = Color3.fromRGB(245, 246, 250), TextSecondary = Color3.fromRGB(140, 148, 170), GradientEnabled = true, GradientColor = Color3.fromRGB(0, 80, 160)
     },
     ["Dark Charcoal"] = {
-        Background = Color3.fromRGB(16, 16, 16), Surface = Color3.fromRGB(24, 24, 24),
-        Border = Color3.fromRGB(45, 45, 45), Accent = Color3.fromRGB(215, 215, 215),
-        RecordActive = Color3.fromRGB(240, 70, 70), PlayActive = Color3.fromRGB(46, 204, 113),
-        ToggleOff = Color3.fromRGB(36, 36, 36), TextPrimary = Color3.fromRGB(245, 245, 245),
-        TextSecondary = Color3.fromRGB(150, 150, 150), GradientEnabled = false
+        Background = Color3.fromRGB(16, 16, 16), Surface = Color3.fromRGB(24, 24, 24), Border = Color3.fromRGB(45, 45, 45), Accent = Color3.fromRGB(215, 215, 215), RecordActive = Color3.fromRGB(240, 70, 70), PlayActive = Color3.fromRGB(46, 204, 113), ToggleOff = Color3.fromRGB(36, 36, 36), TextPrimary = Color3.fromRGB(245, 245, 245), TextSecondary = Color3.fromRGB(150, 150, 150), GradientEnabled = false
     }
 }
-
 local currentThemeName = "Midnight Blue"
 local activeTheme = THEMES[currentThemeName]
 local CustomThemeData = { Hue = 0.58, Saturation = 0.8, Brightness = 0.9, GradientEnabled = true }
@@ -127,14 +94,14 @@ if writefile then pcall(function() writefile(Config.BridgeFileName, "IDLE:0") en
 updateLoad("Compiling Engine Logic...", 0.3)
 
 -- =====================================================================
---  MASTER CORE DEFINITIONS (PREVENTS NIL CLOSURE BUGS)
+--  MASTER CORE DEFINITIONS
 -- =====================================================================
 local Core = {
     Waypoints = {}, isRecording = false, isPlaying = false, currentLoopCount = 0,
     jumpTriggered = false, lastWaypointTime = 0, holdStartTick = nil, mb1StartTick = nil,
     scriptConnections = {}, activeToggles = {}, visualizerPool = { Nodes = {}, Beams = {}, Labels = {} },
     renderTicket = 0, lastBridgeWriteTick = 0, bridgeQueue = nil,
-    UI = {} -- UI References populated at the very end
+    UI = {} -- Holds dynamic UI references
 }
 
 Core.playSoundFeedback = function(pitch)
@@ -198,7 +165,6 @@ end
 
 updateLoad("Injecting Visualizers...", 0.5)
 
--- Visualizer Setup
 Core.visualizerFolder = workspace:FindFirstChild("ManniskaPathVisualizer") or Instance.new("Folder")
 Core.visualizerFolder.Name = "ManniskaPathVisualizer"; Core.visualizerFolder.Parent = workspace
 
@@ -314,7 +280,6 @@ end
 
 updateLoad("Bridging Macro Inputs...", 0.6)
 
--- Core Telemetry & Actions
 Core.updateTelemetry = function(currentNode, totalNodes)
     totalNodes = totalNodes or 0
     local loopTargetStr = (Config.TargetLoops == 0) and "Inf" or tostring(Config.TargetLoops)
@@ -920,22 +885,208 @@ updateLoad("Constructing User Interface...", 0.9)
 --  FINAL UI BINDING & REVEAL
 -- =====================================================================
 local screenGuiRef = screenGui
+Core.UI.screenGui = screenGui
 
--- (Functions map natively back to Core namespace so executor has full address)
-Core.UI.showToast = function(msg) Core.showToast(msg) end
-Core.UI.triggerErrorModal = function(code, desc) Core.triggerErrorModal(code, desc) end
-Core.UI.updateStateBadge = function(name, clr) Core.updateStateBadge(name, clr) end
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainWindow"
+mainFrame.Size = UDim2.new(0, 440, 0, 520); mainFrame.Position = UDim2.new(0.5, -220, 0.32, -260)
+mainFrame.BackgroundColor3 = activeTheme.Background; mainFrame.BackgroundTransparency = 0.15; mainFrame.BorderSizePixel = 0; mainFrame.ClipsDescendants = true; mainFrame.Visible = false; mainFrame.Parent = screenGui
+Core.UI.mainFrame = mainFrame
+registerElement("Background", mainFrame, "BackgroundColor3")
+local mainCorner = Instance.new("UICorner"); mainCorner.CornerRadius = UDim.new(0, 12); mainCorner.Parent = mainFrame
+local mainStroke = Instance.new("UIStroke"); mainStroke.Thickness = 1.2; mainStroke.Color = activeTheme.Border; mainStroke.Transparency = 0.2; mainStroke.Parent = mainFrame
+
+local bgGradient = Instance.new("UIGradient")
+bgGradient.Rotation = 45; bgGradient.Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, activeTheme.Background), ColorSequenceKeypoint.new(1, activeTheme.GradientColor or activeTheme.Background) })
+bgGradient.Enabled = (activeTheme.GradientEnabled == true); bgGradient.Parent = mainFrame
+Core.UI.bgGradient = bgGradient
+
+local errorModal = Instance.new("Frame")
+errorModal.Name = "ErrorModal"; errorModal.Size = UDim2.new(0, 360, 0, 140); errorModal.Position = UDim2.new(0.5, -180, 0.4, -70); errorModal.BackgroundColor3 = Color3.fromRGB(24, 14, 18); errorModal.BorderSizePixel = 0; errorModal.ZIndex = 50; errorModal.Visible = false; errorModal.Parent = screenGui
+Core.UI.errorModal = errorModal
+local errCorner = Instance.new("UICorner"); errCorner.CornerRadius = UDim.new(0, 10); errCorner.Parent = errorModal
+local errStroke = Instance.new("UIStroke"); errStroke.Thickness = 1.5; errStroke.Color = Color3.fromRGB(240, 70, 70); errStroke.Transparency = 0.2; errStroke.Parent = errorModal
+
+local errTitle = Instance.new("TextLabel")
+errTitle.Size = UDim2.new(1, -24, 0, 24); errTitle.Position = UDim2.new(0, 14, 0, 10); errTitle.BackgroundTransparency = 1; errTitle.Text = "⚠ EXECUTION ERROR"; errTitle.TextColor3 = Color3.fromRGB(255, 80, 80); errTitle.TextSize = 13; errTitle.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold); errTitle.TextXAlignment = Enum.TextXAlignment.Left; errTitle.ZIndex = 51; errTitle.Parent = errorModal
+
+local errCodeLabel = Instance.new("TextLabel")
+errCodeLabel.Size = UDim2.new(1, -24, 0, 16); errCodeLabel.Position = UDim2.new(0, 14, 0, 34); errCodeLabel.BackgroundTransparency = 1; errCodeLabel.TextColor3 = Color3.fromRGB(180, 140, 150); errCodeLabel.TextSize = 10; errCodeLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold); errCodeLabel.TextXAlignment = Enum.TextXAlignment.Left; errCodeLabel.ZIndex = 51; errCodeLabel.Parent = errorModal
+Core.UI.errCodeLabel = errCodeLabel
+
+local errDesc = Instance.new("TextLabel")
+errDesc.Size = UDim2.new(1, -28, 0, 40); errDesc.Position = UDim2.new(0, 14, 0, 54); errDesc.BackgroundTransparency = 1; errDesc.TextColor3 = Color3.fromRGB(240, 240, 245); errDesc.TextSize = 11; errDesc.TextWrapped = true; errDesc.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium); errDesc.TextXAlignment = Enum.TextXAlignment.Left; errDesc.ZIndex = 51; errDesc.Parent = errorModal
+Core.UI.errDesc = errDesc
+
+local errDismissBtn = Instance.new("TextButton")
+errDismissBtn.Size = UDim2.new(1, -28, 0, 26); errDismissBtn.Position = UDim2.new(0, 14, 1, -34); errDismissBtn.BackgroundColor3 = Color3.fromRGB(45, 20, 28); errDismissBtn.BorderSizePixel = 0; errDismissBtn.Text = "Dismiss"; errDismissBtn.TextColor3 = Color3.fromRGB(255, 120, 120); errDismissBtn.TextSize = 11; errDismissBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold); errDismissBtn.ZIndex = 51; errDismissBtn.Parent = errorModal
+local errBtnCorner = Instance.new("UICorner"); errBtnCorner.CornerRadius = UDim.new(0, 6); errBtnCorner.Parent = errDismissBtn
+errDismissBtn.MouseButton1Click:Connect(function() Core.UI.errorModal.Visible = false end)
+
+Core.UI.triggerErrorModal = function(errorCode, description)
+    Core.UI.errCodeLabel.Text = "CODE: " .. tostring(errorCode)
+    Core.UI.errDesc.Text = tostring(description)
+    Core.UI.errorModal.Visible = true
+    Core.playSoundFeedback(0.7)
+end
+
+local statusHUD = Instance.new("Frame")
+statusHUD.Name = "PersistentStatusHUD"; statusHUD.Size = UDim2.new(0, 310, 0, 38); statusHUD.Position = UDim2.new(1, -322, 0, 12); statusHUD.BackgroundColor3 = activeTheme.Background; statusHUD.BackgroundTransparency = 0.2; statusHUD.BorderSizePixel = 0; statusHUD.Visible = Config.StatusHUDEnabled; statusHUD.Parent = screenGui
+Core.UI.statusHUD = statusHUD
+registerElement("Background", statusHUD, "BackgroundColor3")
+local hudCorner = Instance.new("UICorner"); hudCorner.CornerRadius = UDim.new(0, 8); hudCorner.Parent = statusHUD
+local hudStroke = Instance.new("UIStroke"); hudStroke.Thickness = 1; hudStroke.Color = activeTheme.Border; hudStroke.Transparency = 0.3; hudStroke.Parent = statusHUD
+registerElement("Border", hudStroke, "Color")
+
+local hudBadge = Instance.new("Frame")
+hudBadge.Size = UDim2.new(0, 48, 0, 20); hudBadge.Position = UDim2.new(0, 10, 0.5, -10); hudBadge.BackgroundColor3 = Color3.fromRGB(60, 65, 80); hudBadge.BorderSizePixel = 0; hudBadge.Parent = statusHUD
+Core.UI.hudBadge = hudBadge
+local hudBadgeCorner = Instance.new("UICorner"); hudBadgeCorner.CornerRadius = UDim.new(0, 4); hudBadgeCorner.Parent = hudBadge
+
+local hudBadgeLabel = Instance.new("TextLabel")
+hudBadgeLabel.Size = UDim2.new(1, 0, 1, 0); hudBadgeLabel.BackgroundTransparency = 1; hudBadgeLabel.Text = "IDLE"; hudBadgeLabel.TextColor3 = Color3.fromRGB(240, 240, 245); hudBadgeLabel.TextSize = 9; hudBadgeLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold); hudBadgeLabel.Parent = hudBadge
+Core.UI.hudBadgeLabel = hudBadgeLabel
+
+local hudNodeLabel = Instance.new("TextLabel")
+hudNodeLabel.Size = UDim2.new(0, 110, 1, 0); hudNodeLabel.Position = UDim2.new(0, 66, 0, 0); hudNodeLabel.BackgroundTransparency = 1; hudNodeLabel.Text = "Node: 0/0"; hudNodeLabel.TextColor3 = activeTheme.TextPrimary; hudNodeLabel.TextSize = 11; hudNodeLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold); hudNodeLabel.TextXAlignment = Enum.TextXAlignment.Left; hudNodeLabel.Parent = statusHUD
+Core.UI.hudNodeLabel = hudNodeLabel
+registerElement("TextPrimary", hudNodeLabel, "TextColor3")
+
+local hudLoopLabel = Instance.new("TextLabel")
+hudLoopLabel.Size = UDim2.new(0, 120, 1, 0); hudLoopLabel.Position = UDim2.new(1, -130, 0, 0); hudLoopLabel.BackgroundTransparency = 1; hudLoopLabel.Text = "Loop: 0/Inf | 1.0x"; hudLoopLabel.TextColor3 = activeTheme.Accent; hudLoopLabel.TextSize = 11; hudLoopLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium); hudLoopLabel.TextXAlignment = Enum.TextXAlignment.Right; hudLoopLabel.Parent = statusHUD
+Core.UI.hudLoopLabel = hudLoopLabel
+registerElement("AccentText", hudLoopLabel, "TextColor3")
+
+local hudDragging, hudDragStart, hudStartPos = false, nil, nil
+statusHUD.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        hudDragging = true; hudDragStart = input.Position; hudStartPos = statusHUD.Position
+        input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then hudDragging = false end end)
+    end
+end)
+local hudMoveConn = UserInputService.InputChanged:Connect(function(input)
+    if hudDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - hudDragStart
+        statusHUD.Position = UDim2.new(hudStartPos.X.Scale, hudStartPos.X.Offset + delta.X, hudStartPos.Y.Scale, hudStartPos.Y.Offset + delta.Y)
+    end
+end)
+table.insert(Core.scriptConnections, hudMoveConn)
+
+local header = Instance.new("Frame")
+header.Size = UDim2.new(1, 0, 0, 48); header.BackgroundColor3 = activeTheme.Surface; header.BackgroundTransparency = 0.2; header.BorderSizePixel = 0; header.Parent = mainFrame
+registerElement("Surface", header, "BackgroundColor3")
+local headerPadding = Instance.new("UIPadding"); headerPadding.PaddingLeft = UDim.new(0, 14); headerPadding.PaddingRight = UDim.new(0, 10); headerPadding.Parent = header
+
+local titleGroup = Instance.new("Frame")
+titleGroup.Size = UDim2.new(1, -110, 1, 0); titleGroup.BackgroundTransparency = 1; titleGroup.Parent = header
+local titleLayout = Instance.new("UIListLayout"); titleLayout.FillDirection = Enum.FillDirection.Vertical; titleLayout.VerticalAlignment = Enum.VerticalAlignment.Center; titleLayout.Padding = UDim.new(0, 2); titleLayout.Parent = titleGroup
+
+local titleTopRow = Instance.new("Frame")
+titleTopRow.Size = UDim2.new(1, 0, 0, 16); titleTopRow.BackgroundTransparency = 1; titleTopRow.Parent = titleGroup
+local titleTopLayout = Instance.new("UIListLayout"); titleTopLayout.FillDirection = Enum.FillDirection.Horizontal; titleTopLayout.VerticalAlignment = Enum.VerticalAlignment.Center; titleTopLayout.Padding = UDim.new(0, 8); titleTopLayout.Parent = titleTopRow
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(0, 145, 1, 0); titleLabel.BackgroundTransparency = 1; titleLabel.Text = "MANNISKAFARM V14.3"; titleLabel.TextColor3 = activeTheme.TextPrimary; titleLabel.TextSize = 13; titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold); titleLabel.TextXAlignment = Enum.TextXAlignment.Left; titleLabel.Parent = titleTopRow
+registerElement("TextPrimary", titleLabel, "TextColor3")
+
+local stateBadge = Instance.new("Frame")
+stateBadge.Size = UDim2.new(0, 56, 0, 16); stateBadge.BackgroundColor3 = Color3.fromRGB(60, 65, 80); stateBadge.BackgroundTransparency = 0.2; stateBadge.BorderSizePixel = 0; stateBadge.Parent = titleTopRow
+Core.UI.stateBadge = stateBadge
+local stateBadgeCorner = Instance.new("UICorner"); stateBadgeCorner.CornerRadius = UDim.new(0, 4); stateBadgeCorner.Parent = stateBadge
+
+local stateBadgeLabel = Instance.new("TextLabel")
+stateBadgeLabel.Size = UDim2.new(1, 0, 1, 0); stateBadgeLabel.BackgroundTransparency = 1; stateBadgeLabel.Text = "IDLE"; stateBadgeLabel.TextColor3 = Color3.fromRGB(220, 225, 235); stateBadgeLabel.TextSize = 9; stateBadgeLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold); stateBadgeLabel.Parent = stateBadge
+Core.UI.stateBadgeLabel = stateBadgeLabel
+
+Core.UI.updateStateBadge = function(stateName, color)
+    Core.UI.stateBadgeLabel.Text = stateName
+    Core.UI.hudBadgeLabel.Text = stateName
+    TweenService:Create(Core.UI.stateBadge, TWEEN_QUICK, { BackgroundColor3 = color }):Play()
+    TweenService:Create(Core.UI.hudBadge, TWEEN_QUICK, { BackgroundColor3 = color }):Play()
+end
+
+local subLabel = Instance.new("TextLabel")
+subLabel.Size = UDim2.new(1, 0, 0, 12); subLabel.BackgroundTransparency = 1; subLabel.Text = "MASTER KINEMATIC SUITE"; subLabel.TextColor3 = activeTheme.Accent; subLabel.TextSize = 10; subLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold); subLabel.TextXAlignment = Enum.TextXAlignment.Left; subLabel.Parent = titleGroup
+registerElement("AccentText", subLabel, "TextColor3")
+
+local headerBtnGroup = Instance.new("Frame")
+headerBtnGroup.Size = UDim2.new(0, 64, 1, 0); headerBtnGroup.Position = UDim2.new(1, -74, 0, 0); headerBtnGroup.BackgroundTransparency = 1; headerBtnGroup.Parent = header
+local hBtnLayout = Instance.new("UIListLayout"); hBtnLayout.FillDirection = Enum.FillDirection.Horizontal; hBtnLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right; hBtnLayout.VerticalAlignment = Enum.VerticalAlignment.Center; hBtnLayout.Padding = UDim.new(0, 6); hBtnLayout.Parent = headerBtnGroup
+
+local isMinimized = false
+local unminimizedHeight = 520
+local minBtn = Instance.new("TextButton")
+minBtn.Size = UDim2.new(0, 28, 0, 28); minBtn.BackgroundColor3 = activeTheme.Surface; minBtn.BackgroundTransparency = 0.6; minBtn.BorderSizePixel = 0; minBtn.AutoButtonColor = false; minBtn.Text = "—"; minBtn.TextColor3 = activeTheme.TextSecondary; minBtn.TextSize = 13; minBtn.Parent = headerBtnGroup
+local minCorner = Instance.new("UICorner"); minCorner.CornerRadius = UDim.new(0, 6); minCorner.Parent = minBtn
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 28, 0, 28); closeBtn.BackgroundColor3 = activeTheme.Surface; closeBtn.BackgroundTransparency = 0.6; closeBtn.BorderSizePixel = 0; closeBtn.AutoButtonColor = false; closeBtn.Text = "×"; closeBtn.TextColor3 = activeTheme.TextSecondary; closeBtn.TextSize = 20; closeBtn.Parent = headerBtnGroup
+local closeCorner = Instance.new("UICorner"); closeCorner.CornerRadius = UDim.new(0, 6); closeCorner.Parent = closeBtn
+
+minBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        unminimizedHeight = mainFrame.AbsoluteSize.Y
+        TweenService:Create(mainFrame, TWEEN_QUICK, { Size = UDim2.new(0, mainFrame.AbsoluteSize.X, 0, 48) }):Play()
+    else
+        TweenService:Create(mainFrame, TWEEN_QUICK, { Size = UDim2.new(0, mainFrame.AbsoluteSize.X, 0, unminimizedHeight) }):Play()
+    end
+end)
+
+local function setGuiVisible(visible)
+    if visible then
+        mainFrame.Visible = true; mainFrame.BackgroundTransparency = 1
+        TweenService:Create(mainFrame, TWEEN_QUICK, { BackgroundTransparency = 0.15 }):Play()
+    else
+        local closeTween = TweenService:Create(mainFrame, TWEEN_QUICK, { BackgroundTransparency = 1 })
+        closeTween:Play()
+        closeTween.Completed:Connect(function() if not mainFrame.Visible then mainFrame.Visible = false end end)
+    end
+end
+closeBtn.MouseButton1Click:Connect(function() setGuiVisible(false) end)
+
+local progressTrack = Instance.new("Frame")
+progressTrack.Size = UDim2.new(1, 0, 0, 2); progressTrack.Position = UDim2.new(0, 0, 0, 48); progressTrack.BackgroundColor3 = activeTheme.Border; progressTrack.BorderSizePixel = 0; progressTrack.Parent = mainFrame
+registerElement("Border", progressTrack, "BackgroundColor3")
+
+local progressBar = Instance.new("Frame")
+progressBar.Size = UDim2.new(0, 0, 1, 0); progressBar.BackgroundColor3 = activeTheme.Accent; progressBar.BorderSizePixel = 0; progressBar.Parent = progressTrack
+Core.UI.progressBar = progressBar
+registerElement("AccentBg", progressBar, "BackgroundColor3")
+
+local toastFrame = Instance.new("Frame")
+toastFrame.Size = UDim2.new(1, -28, 0, 32); toastFrame.Position = UDim2.new(0, 14, 1, 40); toastFrame.BackgroundColor3 = activeTheme.Surface; toastFrame.BorderSizePixel = 0; toastFrame.ZIndex = 20; toastFrame.Parent = mainFrame
+Core.UI.toastFrame = toastFrame
+local toastCorner = Instance.new("UICorner"); toastCorner.CornerRadius = UDim.new(0, 6); toastCorner.Parent = toastFrame
+local toastStroke = Instance.new("UIStroke"); toastStroke.Thickness = 1; toastStroke.Color = activeTheme.Accent; toastStroke.Transparency = 0.4; toastStroke.Parent = toastFrame
+registerElement("AccentBg", toastStroke, "Color")
+
+local toastLabel = Instance.new("TextLabel")
+toastLabel.Size = UDim2.new(1, -16, 1, 0); toastLabel.Position = UDim2.new(0, 8, 0, 0); toastLabel.BackgroundTransparency = 1; toastLabel.Text = "Notification"; toastLabel.TextColor3 = activeTheme.TextPrimary; toastLabel.TextSize = 11; toastLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium); toastLabel.ZIndex = 21; toastLabel.Parent = toastFrame
+Core.UI.toastLabel = toastLabel
+registerElement("TextPrimary", toastLabel, "TextColor3")
+
+local toastSerial = 0
+Core.UI.showToast = function(message)
+    Core.UI.toastLabel.Text = message; toastSerial = toastSerial + 1; local mySerial = toastSerial
+    task.spawn(function()
+        TweenService:Create(Core.UI.toastFrame, TWEEN_BOUNCE, { Position = UDim2.new(0, 14, 1, -44) }):Play()
+        task.wait(2.2)
+        if toastSerial == mySerial then TweenService:Create(Core.UI.toastFrame, TWEEN_QUICK, { Position = UDim2.new(0, 14, 1, 40) }):Play() end
+    end)
+end
 
 local tabContainer = Instance.new("Frame")
-tabContainer.Size = UDim2.new(1, 0, 0, 36); tabContainer.Position = UDim2.new(0, 0, 0, 50); tabContainer.BackgroundColor3 = activeTheme.Surface; tabContainer.BackgroundTransparency = 0.6; tabContainer.BorderSizePixel = 0; tabContainer.Parent = Core.UI.mainFrame
+tabContainer.Size = UDim2.new(1, 0, 0, 36); tabContainer.Position = UDim2.new(0, 0, 0, 50); tabContainer.BackgroundColor3 = activeTheme.Surface; tabContainer.BackgroundTransparency = 0.6; tabContainer.BorderSizePixel = 0; tabContainer.Parent = mainFrame
+registerElement("Surface", tabContainer, "BackgroundColor3")
 local tabLayout = Instance.new("UIListLayout"); tabLayout.FillDirection = Enum.FillDirection.Horizontal; tabLayout.SortOrder = Enum.SortOrder.LayoutOrder; tabLayout.Padding = UDim.new(0, 8); tabLayout.Parent = tabContainer
 local tabPadding = Instance.new("UIPadding"); tabPadding.PaddingLeft = UDim.new(0, 12); tabPadding.PaddingRight = UDim.new(0, 12); tabPadding.Parent = tabContainer
 
 local pages = {}
 local function createPage(name)
     local page = Instance.new("ScrollingFrame")
-    page.Name = name .. "Page"
-    page.Size = UDim2.new(1, 0, 1, -86); page.Position = UDim2.new(0, 0, 0, 86); page.BackgroundTransparency = 1; page.BorderSizePixel = 0; page.ScrollBarThickness = 3; page.ScrollBarImageColor3 = activeTheme.Border; page.CanvasSize = UDim2.new(0, 0, 0, 0); page.AutomaticCanvasSize = Enum.AutomaticSize.Y; page.Visible = false; page.Parent = Core.UI.mainFrame
+    page.Name = name .. "Page"; page.Size = UDim2.new(1, 0, 1, -86); page.Position = UDim2.new(0, 0, 0, 86); page.BackgroundTransparency = 1; page.BorderSizePixel = 0; page.ScrollBarThickness = 3; page.ScrollBarImageColor3 = activeTheme.Border; page.CanvasSize = UDim2.new(0, 0, 0, 0); page.AutomaticCanvasSize = Enum.AutomaticSize.Y; page.Visible = false; page.Parent = mainFrame
+    registerElement("Border", page, "ScrollBarImageColor3")
     local pPadding = Instance.new("UIPadding"); pPadding.PaddingTop = UDim.new(0, 10); pPadding.PaddingBottom = UDim.new(0, 16); pPadding.PaddingLeft = UDim.new(0, 14); pPadding.PaddingRight = UDim.new(0, 14); pPadding.Parent = page
     local pList = Instance.new("UIListLayout"); pList.SortOrder = Enum.SortOrder.LayoutOrder; pList.Padding = UDim.new(0, 8); pList.Parent = page
     pages[name] = page
@@ -954,6 +1105,7 @@ local function createTabButton(name, targetPage, isDefault)
     tabBtn.Size = UDim2.new(0, 72, 1, 0); tabBtn.BackgroundTransparency = 1; tabBtn.Text = name; tabBtn.TextColor3 = isDefault and activeTheme.Accent or activeTheme.TextSecondary; tabBtn.TextSize = 11; tabBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold); tabBtn.Parent = tabContainer
     local indicator = Instance.new("Frame")
     indicator.Size = UDim2.new(1, 0, 0, 2); indicator.Position = UDim2.new(0, 0, 1, -2); indicator.BackgroundColor3 = activeTheme.Accent; indicator.BackgroundTransparency = isDefault and 0 or 1; indicator.BorderSizePixel = 0; indicator.Parent = tabBtn
+    registerElement("AccentBg", indicator, "BackgroundColor3")
 
     tabButtons[name] = { Button = tabBtn, Indicator = indicator, Page = targetPage }
     tabBtn.MouseButton1Click:Connect(function()
@@ -974,12 +1126,15 @@ createTabButton("Safety", safetyPage, false)
 local function createToggleRow(parent, name, labelText, activeColor, onToggled, order, defaultState)
     local row = Instance.new("Frame")
     row.LayoutOrder = order; row.Size = UDim2.new(1, 0, 0, 42); row.BackgroundColor3 = activeTheme.Surface; row.BackgroundTransparency = 0.5; row.BorderSizePixel = 0; row.Parent = parent
+    registerElement("Surface", row, "BackgroundColor3")
     local rowCorner = Instance.new("UICorner"); rowCorner.CornerRadius = UDim.new(0, 8); rowCorner.Parent = row
     local rowStroke = Instance.new("UIStroke"); rowStroke.Thickness = 1; rowStroke.Color = activeTheme.Border; rowStroke.Transparency = 0.5; rowStroke.Parent = row
+    registerElement("Border", rowStroke, "Color")
     local rowPadding = Instance.new("UIPadding"); rowPadding.PaddingLeft = UDim.new(0, 14); rowPadding.PaddingRight = UDim.new(0, 14); rowPadding.Parent = row
     
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, -60, 1, 0); label.BackgroundTransparency = 1; label.Text = labelText; label.TextColor3 = activeTheme.TextPrimary; label.TextSize = 12; label.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium); label.TextXAlignment = Enum.TextXAlignment.Left; label.Parent = row
+    registerElement("TextPrimary", label, "TextColor3")
 
     local switchTrack = Instance.new("TextButton")
     switchTrack.Size = UDim2.new(0, 42, 0, 22); switchTrack.Position = UDim2.new(1, -42, 0.5, -11); switchTrack.BackgroundColor3 = defaultState and activeColor or activeTheme.ToggleOff; switchTrack.BackgroundTransparency = 0.2; switchTrack.BorderSizePixel = 0; switchTrack.AutoButtonColor = false; switchTrack.Text = ""; switchTrack.Parent = row
@@ -1004,6 +1159,12 @@ local function createToggleRow(parent, name, labelText, activeColor, onToggled, 
         end
     end
 
+    table.insert(Core.activeToggles, {
+        UpdateTheme = function()
+            if not isToggled then switchTrack.BackgroundColor3 = activeTheme.ToggleOff; rowStroke.Color = activeTheme.Border end
+        end
+    })
+
     switchTrack.MouseButton1Click:Connect(function() setToggleState(not isToggled) end)
     return { Set = setToggleState, Get = function() return isToggled end }
 end
@@ -1011,8 +1172,10 @@ end
 local function createActionButton(parent, labelText, order, onClick, customColor)
     local btn = Instance.new("TextButton")
     btn.LayoutOrder = order; btn.Size = UDim2.new(1, 0, 0, 36); btn.BackgroundColor3 = customColor or activeTheme.Surface; btn.BackgroundTransparency = customColor and 0.25 or 0.4; btn.BorderSizePixel = 0; btn.AutoButtonColor = false; btn.Text = labelText; btn.TextColor3 = customColor and Color3.fromRGB(255, 255, 255) or activeTheme.TextSecondary; btn.TextSize = 12; btn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold); btn.Parent = parent
+    if not customColor then registerElement("Surface", btn, "BackgroundColor3"); registerElement("TextSecondary", btn, "TextColor3") end
     local btnCorner = Instance.new("UICorner"); btnCorner.CornerRadius = UDim.new(0, 8); btnCorner.Parent = btn
     local btnStroke = Instance.new("UIStroke"); btnStroke.Thickness = 1; btnStroke.Color = customColor or activeTheme.Border; btnStroke.Transparency = 0.5; btnStroke.Parent = btn
+    if not customColor then registerElement("Border", btnStroke, "Color") end
 
     btn.MouseEnter:Connect(function() TweenService:Create(btn, TWEEN_QUICK, { BackgroundColor3 = customColor or activeTheme.Border, TextColor3 = Color3.fromRGB(255, 255, 255) }):Play() end)
     btn.MouseLeave:Connect(function() TweenService:Create(btn, TWEEN_QUICK, { BackgroundColor3 = customColor or activeTheme.Surface, TextColor3 = customColor and Color3.fromRGB(255, 255, 255) or activeTheme.TextSecondary }):Play() end)
@@ -1028,23 +1191,29 @@ end
 local function createSliderRow(parent, name, labelText, minVal, maxVal, defaultVal, formatStr, onValueChanged, order)
     local row = Instance.new("Frame")
     row.LayoutOrder = order; row.Size = UDim2.new(1, 0, 0, 48); row.BackgroundColor3 = activeTheme.Surface; row.BackgroundTransparency = 0.5; row.BorderSizePixel = 0; row.Parent = parent
+    registerElement("Surface", row, "BackgroundColor3")
     local rowCorner = Instance.new("UICorner"); rowCorner.CornerRadius = UDim.new(0, 8); rowCorner.Parent = row
     local rowStroke = Instance.new("UIStroke"); rowStroke.Thickness = 1; rowStroke.Color = activeTheme.Border; rowStroke.Transparency = 0.5; rowStroke.Parent = row
+    registerElement("Border", rowStroke, "Color")
     local rowPadding = Instance.new("UIPadding"); rowPadding.PaddingLeft = UDim.new(0, 14); rowPadding.PaddingRight = UDim.new(0, 14); rowPadding.Parent = row
 
     local titleLbl = Instance.new("TextLabel")
     titleLbl.Size = UDim2.new(0.6, 0, 0, 20); titleLbl.Position = UDim2.new(0, 0, 0, 6); titleLbl.BackgroundTransparency = 1; titleLbl.Text = labelText; titleLbl.TextColor3 = activeTheme.TextPrimary; titleLbl.TextSize = 12; titleLbl.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium); titleLbl.TextXAlignment = Enum.TextXAlignment.Left; titleLbl.Parent = row
+    registerElement("TextPrimary", titleLbl, "TextColor3")
 
     local valLbl = Instance.new("TextLabel")
     valLbl.Size = UDim2.new(0.4, 0, 0, 20); valLbl.Position = UDim2.new(0.6, 0, 0, 6); valLbl.BackgroundTransparency = 1; valLbl.Text = (formatStr == "Loops: %d" and defaultVal == 0) and "Loops: Inf" or string.format(formatStr, defaultVal); valLbl.TextColor3 = activeTheme.Accent; valLbl.TextSize = 12; valLbl.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold); valLbl.TextXAlignment = Enum.TextXAlignment.Right; valLbl.Parent = row
+    registerElement("AccentText", valLbl, "TextColor3")
 
     local sliderBar = Instance.new("Frame")
     sliderBar.Size = UDim2.new(1, 0, 0, 6); sliderBar.Position = UDim2.new(0, 0, 1, -14); sliderBar.BackgroundColor3 = activeTheme.ToggleOff; sliderBar.BorderSizePixel = 0; sliderBar.Parent = row
+    registerElement("ToggleOff", sliderBar, "BackgroundColor3")
     local sCorner = Instance.new("UICorner"); sCorner.CornerRadius = UDim.new(1, 0); sCorner.Parent = sliderBar
 
     local fillBar = Instance.new("Frame")
     local initRatio = math.clamp((defaultVal - minVal) / (maxVal - minVal), 0, 1)
     fillBar.Size = UDim2.new(initRatio, 0, 1, 0); fillBar.BackgroundColor3 = activeTheme.Accent; fillBar.BorderSizePixel = 0; fillBar.Parent = sliderBar
+    registerElement("AccentBg", fillBar, "BackgroundColor3")
     local fCorner = Instance.new("UICorner"); fCorner.CornerRadius = UDim.new(1, 0); fCorner.Parent = fillBar
 
     local draggingSlider = false
@@ -1063,14 +1232,10 @@ local function createSliderRow(parent, name, labelText, minVal, maxVal, defaultV
     end
 
     sliderBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            draggingSlider = true; updateValue(input.Position.X)
-        end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingSlider = true; updateValue(input.Position.X) end
     end)
     local moveConn = UserInputService.InputChanged:Connect(function(input)
-        if draggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            updateValue(input.Position.X)
-        end
+        if draggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then updateValue(input.Position.X) end
     end)
     table.insert(Core.scriptConnections, moveConn)
     local endConn = UserInputService.InputEnded:Connect(function(input)
@@ -1084,19 +1249,41 @@ end
 local function createSectionHeader(parent, titleText, order)
     local secHeader = Instance.new("TextLabel")
     secHeader.LayoutOrder = order; secHeader.Size = UDim2.new(1, 0, 0, 20); secHeader.BackgroundTransparency = 1; secHeader.Text = string.upper(titleText); secHeader.TextColor3 = activeTheme.Accent; secHeader.TextSize = 10; secHeader.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold); secHeader.TextXAlignment = Enum.TextXAlignment.Left; secHeader.Parent = parent
+    registerElement("AccentText", secHeader, "TextColor3")
     return secHeader
 end
+
+local telemetryCard = Instance.new("Frame")
+telemetryCard.LayoutOrder = 1; telemetryCard.Size = UDim2.new(1, 0, 0, 44); telemetryCard.BackgroundColor3 = activeTheme.Surface; telemetryCard.BackgroundTransparency = 0.35; telemetryCard.BorderSizePixel = 0; telemetryCard.Parent = controlsPage
+registerElement("Surface", telemetryCard, "BackgroundColor3")
+local tCardCorner = Instance.new("UICorner"); tCardCorner.CornerRadius = UDim.new(0, 8); tCardCorner.Parent = telemetryCard
+local tCardStroke = Instance.new("UIStroke"); tCardStroke.Thickness = 1; tCardStroke.Color = activeTheme.Border; tCardStroke.Transparency = 0.4; tCardStroke.Parent = telemetryCard
+registerElement("Border", tCardStroke, "Color")
+local tCardPadding = Instance.new("UIPadding"); tCardPadding.PaddingLeft = UDim.new(0, 14); tCardPadding.PaddingRight = UDim.new(0, 14); tCardPadding.Parent = telemetryCard
+
+local nodeStatsLabel = Instance.new("TextLabel")
+nodeStatsLabel.Size = UDim2.new(0.58, -4, 1, 0); nodeStatsLabel.Position = UDim2.new(0, 0, 0, 0); nodeStatsLabel.BackgroundTransparency = 1; nodeStatsLabel.Text = "Waypoints: 0 | Loop: 0/Inf"; nodeStatsLabel.TextColor3 = activeTheme.TextPrimary; nodeStatsLabel.TextSize = 11; nodeStatsLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold); nodeStatsLabel.TextXAlignment = Enum.TextXAlignment.Left; nodeStatsLabel.Parent = telemetryCard
+Core.UI.nodeStatsLabel = nodeStatsLabel
+registerElement("TextPrimary", nodeStatsLabel, "TextColor3")
+
+local routeModeLabel = Instance.new("TextLabel")
+routeModeLabel.Size = UDim2.new(0.42, -4, 1, 0); routeModeLabel.Position = UDim2.new(0.58, 4, 0, 0); routeModeLabel.BackgroundTransparency = 1; routeModeLabel.Text = "Mode: Loop (1.00x)"; routeModeLabel.TextColor3 = activeTheme.Accent; routeModeLabel.TextSize = 11; routeModeLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium); routeModeLabel.TextXAlignment = Enum.TextXAlignment.Right; routeModeLabel.Parent = telemetryCard
+Core.UI.routeModeLabel = routeModeLabel
+registerElement("AccentText", routeModeLabel, "TextColor3")
 
 Core.UI.recordToggleControl = createToggleRow(controlsPage, "RecordToggle", "Record Route Path", activeTheme.RecordActive, function(state) if state then Core.startRecording() else Core.stopRecording() end end, 2)
 Core.UI.playToggleControl = createToggleRow(controlsPage, "PlayToggle", "Execute Playback Route", activeTheme.PlayActive, function(state) if state then Core.startPlayback() else Core.stopPlayback() end end, 3)
 
 local fileRow = Instance.new("Frame")
 fileRow.LayoutOrder = 4; fileRow.Size = UDim2.new(1, 0, 0, 42); fileRow.BackgroundColor3 = activeTheme.Surface; fileRow.BackgroundTransparency = 0.5; fileRow.BorderSizePixel = 0; fileRow.Parent = controlsPage
+registerElement("Surface", fileRow, "BackgroundColor3")
 local fileCorner = Instance.new("UICorner"); fileCorner.CornerRadius = UDim.new(0, 8); fileCorner.Parent = fileRow
 local fileStroke = Instance.new("UIStroke"); fileStroke.Thickness = 1; fileStroke.Color = activeTheme.Border; fileStroke.Transparency = 0.5; fileStroke.Parent = fileRow
+registerElement("Border", fileStroke, "Color")
 
 local fileInput = Instance.new("TextBox")
 fileInput.Size = UDim2.new(1, -156, 1, 0); fileInput.Position = UDim2.new(0, 10, 0, 0); fileInput.BackgroundTransparency = 1; fileInput.Text = "ManniskaFarm_Route.json"; fileInput.PlaceholderText = "RouteFileName.json"; fileInput.TextColor3 = activeTheme.TextPrimary; fileInput.TextSize = 12; fileInput.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium); fileInput.TextXAlignment = Enum.TextXAlignment.Left; fileInput.ClearTextOnFocus = false; fileInput.Parent = fileRow
+registerElement("TextPrimary", fileInput, "TextColor3")
 
 local saveBtn = Instance.new("TextButton")
 saveBtn.Size = UDim2.new(0, 64, 0, 26); saveBtn.Position = UDim2.new(1, -138, 0.5, -13); saveBtn.BackgroundColor3 = activeTheme.Border; saveBtn.BackgroundTransparency = 0.3; saveBtn.BorderSizePixel = 0; saveBtn.Text = "Save"; saveBtn.TextColor3 = activeTheme.TextPrimary; saveBtn.TextSize = 11; saveBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold); saveBtn.Parent = fileRow
@@ -1110,11 +1297,14 @@ loadBtn.MouseButton1Click:Connect(function() Core.loadRouteFromFile(fileInput.Te
 
 local dropdownCard = Instance.new("Frame")
 dropdownCard.LayoutOrder = 5; dropdownCard.Size = UDim2.new(1, 0, 0, 72); dropdownCard.BackgroundColor3 = activeTheme.Surface; dropdownCard.BackgroundTransparency = 0.6; dropdownCard.BorderSizePixel = 0; dropdownCard.Parent = controlsPage
+registerElement("Surface", dropdownCard, "BackgroundColor3")
 local ddCorner = Instance.new("UICorner"); ddCorner.CornerRadius = UDim.new(0, 8); ddCorner.Parent = dropdownCard
 local ddStroke = Instance.new("UIStroke"); ddStroke.Thickness = 1; ddStroke.Color = activeTheme.Border; ddStroke.Transparency = 0.5; ddStroke.Parent = dropdownCard
+registerElement("Border", ddStroke, "Color")
 
 local ddList = Instance.new("ScrollingFrame")
 ddList.Size = UDim2.new(1, -12, 1, -8); ddList.Position = UDim2.new(0, 6, 0, 4); ddList.BackgroundTransparency = 1; ddList.BorderSizePixel = 0; ddList.ScrollBarThickness = 2; ddList.ScrollBarImageColor3 = activeTheme.Accent; ddList.CanvasSize = UDim2.new(0, 0, 0, 0); ddList.AutomaticCanvasSize = Enum.AutomaticSize.Y; ddList.Parent = dropdownCard
+registerElement("AccentBg", ddList, "ScrollBarImageColor3")
 local ddLayout = Instance.new("UIListLayout"); ddLayout.SortOrder = Enum.SortOrder.LayoutOrder; ddLayout.Padding = UDim.new(0, 4); ddLayout.Parent = ddList
 
 local function refreshFileList()
@@ -1140,15 +1330,19 @@ createSectionHeader(settingsPage, "Playback & Scaling", 1)
 
 local modeRow = Instance.new("Frame")
 modeRow.LayoutOrder = 2; modeRow.Size = UDim2.new(1, 0, 0, 42); modeRow.BackgroundColor3 = activeTheme.Surface; modeRow.BackgroundTransparency = 0.5; modeRow.BorderSizePixel = 0; modeRow.Parent = settingsPage
+registerElement("Surface", modeRow, "BackgroundColor3")
 local modeCorner = Instance.new("UICorner"); modeCorner.CornerRadius = UDim.new(0, 8); modeCorner.Parent = modeRow
 local modeStroke = Instance.new("UIStroke"); modeStroke.Thickness = 1; modeStroke.Color = activeTheme.Border; modeStroke.Transparency = 0.5; modeStroke.Parent = modeRow
+registerElement("Border", modeStroke, "Color")
 local modePadding = Instance.new("UIPadding"); modePadding.PaddingLeft = UDim.new(0, 14); modePadding.PaddingRight = UDim.new(0, 14); modePadding.Parent = modeRow
 
 local modeLabel = Instance.new("TextLabel")
 modeLabel.Size = UDim2.new(1, -120, 1, 0); modeLabel.BackgroundTransparency = 1; modeLabel.Text = "Playback Route Mode"; modeLabel.TextColor3 = activeTheme.TextPrimary; modeLabel.TextSize = 12; modeLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium); modeLabel.TextXAlignment = Enum.TextXAlignment.Left; modeLabel.Parent = modeRow
+registerElement("TextPrimary", modeLabel, "TextColor3")
 
 local modeBtn = Instance.new("TextButton")
 modeBtn.Size = UDim2.new(0, 100, 0, 26); modeBtn.Position = UDim2.new(1, -100, 0.5, -13); modeBtn.BackgroundColor3 = activeTheme.ToggleOff; modeBtn.BackgroundTransparency = 0.2; modeBtn.BorderSizePixel = 0; modeBtn.Text = Config.PlaybackMode; modeBtn.TextColor3 = activeTheme.Accent; modeBtn.TextSize = 11; modeBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold); modeBtn.Parent = modeRow
+registerElement("ToggleOff", modeBtn, "BackgroundColor3")
 local modeBtnCorner = Instance.new("UICorner"); modeBtnCorner.CornerRadius = UDim.new(0, 6); modeBtnCorner.Parent = modeBtn
 
 local modes = { "Loop", "Ping-Pong", "One-Shot", "Reverse" }
@@ -1164,7 +1358,7 @@ createSliderRow(settingsPage, "LoopSlider", "Loop Count Limit", 0, 200, Config.T
 createSliderRow(settingsPage, "SpeedSlider", "Playback Speed", 0.5, 3.0, Config.SpeedMultiplier, "%.2fx", function(val) Config.SpeedMultiplier = math.floor(val * 100) / 100; Core.updateTelemetry(nil, #Core.Waypoints) end, 4)
 
 createSectionHeader(settingsPage, "Hardware Bridge & Integration", 5)
-createToggleRow(settingsPage, "BridgeToggle", "External Macro Bridge (.NET)", activeTheme.PlayActive, function(state) Config.UseExternalBridge = state; Core.showToast("Hardware Bridge: " .. (state and "Enabled" or "Disabled")) end, 6, Config.UseExternalBridge)
+createToggleRow(settingsPage, "BridgeToggle", "External Macro Bridge (.NET)", activeTheme.PlayActive, function(state) Config.UseExternalBridge = state; Core.UI.showToast("Hardware Bridge: " .. (state and "Enabled" or "Disabled")) end, 6, Config.UseExternalBridge)
 
 createSectionHeader(settingsPage, "Display & Visualizer", 7)
 createToggleRow(settingsPage, "StatusHUDToggle", "Persistent Status Bar (Draggable)", activeTheme.Accent, function(state) Config.StatusHUDEnabled = state; Core.UI.statusHUD.Visible = state end, 8, Config.StatusHUDEnabled)
@@ -1178,15 +1372,19 @@ local activeBindingKey = nil
 local function createKeybindRow(labelText, actionKeyName, order)
     local row = Instance.new("Frame")
     row.LayoutOrder = order; row.Size = UDim2.new(1, 0, 0, 42); row.BackgroundColor3 = activeTheme.Surface; row.BackgroundTransparency = 0.5; row.BorderSizePixel = 0; row.Parent = settingsPage
+    registerElement("Surface", row, "BackgroundColor3")
     local kCorner = Instance.new("UICorner"); kCorner.CornerRadius = UDim.new(0, 8); kCorner.Parent = row
     local kStroke = Instance.new("UIStroke"); kStroke.Thickness = 1; kStroke.Color = activeTheme.Border; kStroke.Transparency = 0.5; kStroke.Parent = row
+    registerElement("Border", kStroke, "Color")
     local kPadding = Instance.new("UIPadding"); kPadding.PaddingLeft = UDim.new(0, 14); kPadding.PaddingRight = UDim.new(0, 14); kPadding.Parent = row
 
     local kLabel = Instance.new("TextLabel")
     kLabel.Size = UDim2.new(1, -120, 1, 0); kLabel.BackgroundTransparency = 1; kLabel.Text = labelText; kLabel.TextColor3 = activeTheme.TextPrimary; kLabel.TextSize = 12; kLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium); kLabel.TextXAlignment = Enum.TextXAlignment.Left; kLabel.Parent = row
+    registerElement("TextPrimary", kLabel, "TextColor3")
 
     local kBtn = Instance.new("TextButton")
     kBtn.Size = UDim2.new(0, 100, 0, 26); kBtn.Position = UDim2.new(1, -100, 0.5, -13); kBtn.BackgroundColor3 = activeTheme.ToggleOff; kBtn.BackgroundTransparency = 0.2; kBtn.BorderSizePixel = 0; kBtn.AutoButtonColor = false; kBtn.Text = Keybinds[actionKeyName].Name; kBtn.TextColor3 = activeTheme.TextPrimary; kBtn.TextSize = 11; kBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold); kBtn.Parent = row
+    registerElement("ToggleOff", kBtn, "BackgroundColor3"); registerElement("TextPrimary", kBtn, "TextColor3")
     local kBtnCorner = Instance.new("UICorner"); kBtnCorner.CornerRadius = UDim.new(0, 6); kBtnCorner.Parent = kBtn
 
     kBtn.MouseButton1Click:Connect(function()
@@ -1210,19 +1408,85 @@ local inputConnection = UserInputService.InputBegan:Connect(function(input, game
         if activeBindingKey == "ToggleRecord" then bindRec.Button.Text = input.KeyCode.Name; bindRec.Button.TextColor3 = activeTheme.TextPrimary end
         if activeBindingKey == "TogglePlay" then bindPlay.Button.Text = input.KeyCode.Name; bindPlay.Button.TextColor3 = activeTheme.TextPrimary end
         if activeBindingKey == "UndoNode" then bindUndo.Button.Text = input.KeyCode.Name; bindUndo.Button.TextColor3 = activeTheme.TextPrimary end
-        Core.showToast(string.format("%s set to: %s", activeBindingKey, input.KeyCode.Name))
+        Core.UI.showToast(string.format("%s set to: %s", activeBindingKey, input.KeyCode.Name))
         activeBindingKey = nil
         return
     end
 
     if not gameProcessed and input.UserInputType == Enum.UserInputType.Keyboard then
-        if input.KeyCode == Keybinds.ToggleMenu then Core.UI.mainFrame.Visible = not Core.UI.mainFrame.Visible
+        if input.KeyCode == Keybinds.ToggleMenu then 
+            if Core.UI.mainFrame then setGuiVisible(not Core.UI.mainFrame.Visible) end
         elseif input.KeyCode == Keybinds.ToggleRecord then if Core.UI.recordToggleControl and typeof(Core.UI.recordToggleControl.Get) == "function" then Core.UI.recordToggleControl.Set(not Core.UI.recordToggleControl.Get()) end
         elseif input.KeyCode == Keybinds.TogglePlay then if Core.UI.playToggleControl and typeof(Core.UI.playToggleControl.Get) == "function" then Core.UI.playToggleControl.Set(not Core.UI.playToggleControl.Get()) end
         elseif input.KeyCode == Keybinds.UndoNode then Core.undoLastNode() end
     end
 end)
 table.insert(Core.scriptConnections, inputConnection)
+
+createSectionHeader(settingsPage, "Theme Selector & Studio", 18)
+local function applyTheme(themeName, customPalette)
+    currentThemeName = themeName
+    activeTheme = customPalette or THEMES[themeName]
+
+    for _, item in ipairs(themeElements.Background) do item.Object[item.Property] = activeTheme.Background end
+    for _, item in ipairs(themeElements.Surface) do item.Object[item.Property] = activeTheme.Surface end
+    for _, item in ipairs(themeElements.Border) do item.Object[item.Property] = activeTheme.Border end
+    for _, item in ipairs(themeElements.AccentText) do item.Object[item.Property] = activeTheme.Accent end
+    for _, item in ipairs(themeElements.AccentBg) do item.Object[item.Property] = activeTheme.Accent end
+    for _, item in ipairs(themeElements.TextPrimary) do item.Object[item.Property] = activeTheme.TextPrimary end
+    for _, item in ipairs(themeElements.TextSecondary) do item.Object[item.Property] = activeTheme.TextSecondary end
+    for _, item in ipairs(themeElements.ToggleOff) do item.Object[item.Property] = activeTheme.ToggleOff end
+
+    if activeTheme.GradientEnabled and Core.UI.bgGradient then
+        Core.UI.bgGradient.Enabled = true
+        Core.UI.bgGradient.Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, activeTheme.Background), ColorSequenceKeypoint.new(1, activeTheme.GradientColor or activeTheme.Accent) })
+    elseif Core.UI.bgGradient then
+        Core.UI.bgGradient.Enabled = false
+    end
+
+    for _, t in ipairs(Core.activeToggles) do t.UpdateTheme() end
+    Core.UI.showToast("Theme: " .. themeName)
+end
+
+local themeOrder = { "Midnight Blue", "Dark Charcoal" }
+for idx, name in ipairs(themeOrder) do
+    local themePreset = THEMES[name]
+    local themeOption = Instance.new("TextButton")
+    themeOption.LayoutOrder = 18 + idx; themeOption.Size = UDim2.new(1, 0, 0, 36); themeOption.BackgroundColor3 = themePreset.Surface; themeOption.BackgroundTransparency = 0.4; themeOption.BorderSizePixel = 0; themeOption.AutoButtonColor = false; themeOption.Text = "   " .. name; themeOption.TextColor3 = themePreset.TextPrimary; themeOption.TextSize = 12; themeOption.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium); themeOption.TextXAlignment = Enum.TextXAlignment.Left; themeOption.Parent = settingsPage
+    local tCorner = Instance.new("UICorner"); tCorner.CornerRadius = UDim.new(0, 6); tCorner.Parent = themeOption
+    local previewDot = Instance.new("Frame"); previewDot.Size = UDim2.new(0, 12, 0, 12); previewDot.Position = UDim2.new(1, -22, 0.5, -6); previewDot.BackgroundColor3 = themePreset.Accent; previewDot.BorderSizePixel = 0; previewDot.Parent = themeOption
+    local pCorner = Instance.new("UICorner"); pCorner.CornerRadius = UDim.new(1, 0); pCorner.Parent = previewDot
+    themeOption.MouseButton1Click:Connect(function() applyTheme(name) end)
+end
+
+local function updateCustomThemeFromSliders()
+    local accentCol = Color3.fromHSV(CustomThemeData.Hue, CustomThemeData.Saturation, CustomThemeData.Brightness)
+    local bgCol = Color3.fromHSV(CustomThemeData.Hue, math.clamp(CustomThemeData.Saturation * 0.4, 0.1, 0.4), 0.08)
+    local surfCol = Color3.fromHSV(CustomThemeData.Hue, math.clamp(CustomThemeData.Saturation * 0.35, 0.1, 0.35), 0.12)
+    local borderCol = Color3.fromHSV(CustomThemeData.Hue, math.clamp(CustomThemeData.Saturation * 0.5, 0.2, 0.5), 0.25)
+    local gradCol = Color3.fromHSV(CustomThemeData.Hue, CustomThemeData.Saturation * 0.8, 0.3)
+
+    local customPalette = {
+        Background = bgCol, Surface = surfCol, Border = borderCol, Accent = accentCol, RecordActive = Color3.fromRGB(240, 70, 70), PlayActive = Color3.fromRGB(46, 204, 113), ToggleOff = Color3.fromHSV(CustomThemeData.Hue, 0.2, 0.18), TextPrimary = Color3.fromRGB(245, 246, 250), TextSecondary = Color3.fromRGB(150, 160, 180), GradientEnabled = CustomThemeData.GradientEnabled, GradientColor = gradCol
+    }
+    applyTheme("Custom Theme", customPalette)
+    if writefile then pcall(function() writefile("ManniskaFarm_CustomTheme.json", HttpService:JSONEncode(CustomThemeData)) end) end
+end
+
+createSliderRow(settingsPage, "HueSlider", "Theme Accent Hue", 0.0, 1.0, CustomThemeData.Hue, "Hue: %.2f", function(val) CustomThemeData.Hue = val; updateCustomThemeFromSliders() end, 25)
+createSliderRow(settingsPage, "SatSlider", "Theme Saturation", 0.0, 1.0, CustomThemeData.Saturation, "Sat: %.2f", function(val) CustomThemeData.Saturation = val; updateCustomThemeFromSliders() end, 26)
+createSliderRow(settingsPage, "BrightSlider", "Theme Brightness", 0.3, 1.0, CustomThemeData.Brightness, "Light: %.2f", function(val) CustomThemeData.Brightness = val; updateCustomThemeFromSliders() end, 27)
+createToggleRow(settingsPage, "CustomGradToggle", "Background Gradient Overlay", activeTheme.Accent, function(state) CustomThemeData.GradientEnabled = state; updateCustomThemeFromSliders() end, 28, CustomThemeData.GradientEnabled)
+
+if readfile and isfile and isfile("ManniskaFarm_CustomTheme.json") then
+    pcall(function()
+        local dec = HttpService:JSONDecode(readfile("ManniskaFarm_CustomTheme.json"))
+        if typeof(dec) == "table" and dec.Hue then
+            CustomThemeData.Hue = dec.Hue; CustomThemeData.Saturation = dec.Saturation; CustomThemeData.Brightness = dec.Brightness; CustomThemeData.GradientEnabled = (dec.GradientEnabled == true)
+            task.defer(updateCustomThemeFromSliders)
+        end
+    end)
+end
 
 createSectionHeader(advancedPage, "Humanization & Randomization", 1)
 createToggleRow(advancedPage, "MicroRandToggle", "Micro Randomization (Human Timing)", activeTheme.Accent, function(state) Config.MicroRandomization = state end, 2, Config.MicroRandomization)
@@ -1251,6 +1515,24 @@ local termCorner = Instance.new("UICorner"); termCorner.CornerRadius = UDim.new(
 local termStroke = Instance.new("UIStroke"); termStroke.Thickness = 1.2; termStroke.Color = Color3.fromRGB(240, 70, 70); termStroke.Transparency = 0.4; termStroke.Parent = terminateBtn
 terminateBtn.MouseButton1Click:Connect(function() Core.terminateProcess() end)
 
+local resizeHandle = Instance.new("TextButton")
+resizeHandle.Size = UDim2.new(0, 18, 0, 18); resizeHandle.Position = UDim2.new(1, -18, 1, -18); resizeHandle.BackgroundTransparency = 1; resizeHandle.Text = "◢"; resizeHandle.TextColor3 = activeTheme.TextSecondary; resizeHandle.Parent = Core.UI.mainFrame
+
+local dragging, dragStartPos, frameStartPos = false, nil, nil
+header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true; dragStartPos = input.Position; frameStartPos = Core.UI.mainFrame.Position
+        input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+    end
+end)
+local dragChangeConn = UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStartPos
+        Core.UI.mainFrame.Position = UDim2.new(frameStartPos.X.Scale, frameStartPos.X.Offset + delta.X, frameStartPos.Y.Scale, frameStartPos.Y.Offset + delta.Y)
+    end
+end)
+table.insert(Core.scriptConnections, dragChangeConn)
+
 -- =====================================================================
 --  FINAL BOOT & GLOBALS
 -- =====================================================================
@@ -1261,32 +1543,14 @@ _G.Autofarm_Control = {
     Save = Core.saveRouteToFile, Load = Core.loadRouteFromFile, Export = Core.copyRouteToClipboard, Terminate = Core.terminateProcess, Config = Config, Keybinds = Keybinds
 }
 
-task.spawn(function()
-    if not (readfile and isfile and isfile("ManniskaFarm_AutoRun.json")) then return end
-    local success, dec = pcall(function() return HttpService:JSONDecode(readfile("ManniskaFarm_AutoRun.json")) end)
-    if success and typeof(dec) == "table" and dec.Enabled and dec.Route then
-        if not game:IsLoaded() then game.Loaded:Wait() end
-        local char = player.Character or player.CharacterAdded:Wait()
-        task.wait(1.5)
-        local _, root = Core.getCharacter()
-        if root and root:IsA("BasePart") then
-            task.wait(3.5)
-            Core.loadRouteFromFile(dec.Route)
-            task.wait(1.0)
-            if Core.UI.playToggleControl and typeof(Core.UI.playToggleControl.Set) == "function" then Core.UI.playToggleControl.Set(true, false) else Core.startPlayback() end
-            Core.showToast("Auto-Rejoin: Resumed route " .. dec.Route)
-        end
-    end
-end)
-
 updateLoad("Complete!", 1.0)
-task.wait(0.6)
+task.wait(0.4)
 TweenService:Create(loadFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { BackgroundTransparency = 1 }):Play()
 TweenService:Create(loadTitle, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { TextTransparency = 1 }):Play()
 TweenService:Create(loadStatus, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { TextTransparency = 1 }):Play()
 TweenService:Create(loadBarBg, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { BackgroundTransparency = 1 }):Play()
 TweenService:Create(loadBarFill, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { BackgroundTransparency = 1 }):Play()
 TweenService:Create(loadStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Transparency = 1 }):Play()
-
 task.delay(0.5, function() loadGui:Destroy() end)
-print("🚀 Autofarm V14.2 (Inverted Architecture) Loaded.")
+
+print("🚀 Autofarm V14.3 (Complete Structure Recovery) Loaded.")
