@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V12.6 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V12.7 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -295,7 +295,7 @@ end
 
 -- Shared UI Handles
 local updateStateBadge, showToast, triggerErrorModal, updateTelemetry, renderVisualPath, clearVisuals, setHaloTarget
-local errorModal, statusHUD, hudBadgeLabel, hudNodeLabel, hudLoopLabel, hudBadge, progressBar, nodeStatsLabel, routeModeLabel, mainFrame, bgGradient
+local errorModal, statusHUD, hudBadgeLabel, hudNodeLabel, hudLoopLabel, hudBadge, progressBar, nodeStatsLabel, routeModeLabel, mainFrame, bgGradient, editPanel, isEditMode
 
 -- Global Control Forward References
 local startRecording, stopRecording, startPlayback, stopPlayback, clearWaypoints, undoLastNode, saveRouteToFile, loadRouteFromFile, copyRouteToClipboard, terminateProcess
@@ -644,7 +644,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V12.6"
+    titleLabel.Text = "MANNISKAFARM V12.7"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -1458,6 +1458,16 @@ do
     createActionButton(controlsPage, "Clear Path Waypoints", 8, function()
         clearWaypoints()
     end)
+
+    createToggleRow(controlsPage, "EditModeToggle", "Enable Proximity Node Editor", Color3.fromRGB(255, 170, 0), function(state)
+        isEditMode = state
+        if not state then
+            if editPanel then editPanel.Visible = false end
+            if setHaloTarget then setHaloTarget(nil) end
+        else
+            if showToast then showToast("Edit Mode ON: Walk near a node to edit.") end
+        end
+    end, 9, false)
 
     -- --- SETTINGS PAGE ---
     createSectionHeader(settingsPage, "Playback & Scaling", 1)
@@ -2956,6 +2966,197 @@ task.spawn(function()
     end
 end)
 
+-- =====================================================================
+-- PROXIMITY NODE EDITOR UI & LOGIC
+-- =====================================================================
+isEditMode = false
+editPanel = Instance.new("Frame")
+editPanel.Name = "EditPanel"
+editPanel.Size = UDim2.new(0, 220, 0, 180)
+editPanel.Position = UDim2.new(1, -240, 0.5, -90)
+editPanel.BackgroundColor3 = activeTheme.Background
+editPanel.BackgroundTransparency = 0.15
+editPanel.BorderSizePixel = 0
+editPanel.Visible = false
+editPanel.Parent = screenGui
+if themeElements and themeElements.Background then table.insert(themeElements.Background, { Object = editPanel, Property = "BackgroundColor3" }) end
+
+local epCorner = Instance.new("UICorner"); epCorner.CornerRadius = UDim.new(0, 8); epCorner.Parent = editPanel
+local epStroke = Instance.new("UIStroke"); epStroke.Thickness = 1.5; epStroke.Color = Color3.fromRGB(255, 170, 0); epStroke.Parent = editPanel
+
+local epTitle = Instance.new("TextLabel")
+epTitle.Size = UDim2.new(1, 0, 0, 24); epTitle.BackgroundTransparency = 1; epTitle.Text = "NODE EDITOR"; epTitle.TextColor3 = Color3.fromRGB(255, 170, 0); epTitle.TextSize = 12; epTitle.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold); epTitle.Parent = editPanel
+
+local epNodeLabel = Instance.new("TextLabel")
+epNodeLabel.Size = UDim2.new(1, -20, 0, 16); epNodeLabel.Position = UDim2.new(0, 10, 0, 28); epNodeLabel.BackgroundTransparency = 1; epNodeLabel.Text = "Target: #0 / 0"; epNodeLabel.TextColor3 = activeTheme.TextPrimary; epNodeLabel.TextSize = 11; epNodeLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold); epNodeLabel.TextXAlignment = Enum.TextXAlignment.Left; epNodeLabel.Parent = editPanel
+if themeElements and themeElements.TextPrimary then table.insert(themeElements.TextPrimary, { Object = epNodeLabel, Property = "TextColor3" }) end
+
+local epTypeBtn = Instance.new("TextButton")
+epTypeBtn.Size = UDim2.new(1, -20, 0, 24); epTypeBtn.Position = UDim2.new(0, 10, 0, 48); epTypeBtn.BackgroundColor3 = activeTheme.Surface; epTypeBtn.BorderSizePixel = 0; epTypeBtn.Text = "Type: Walk"; epTypeBtn.TextColor3 = activeTheme.Accent; epTypeBtn.TextSize = 11; epTypeBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold); epTypeBtn.Parent = editPanel
+if themeElements and themeElements.Surface then table.insert(themeElements.Surface, { Object = epTypeBtn, Property = "BackgroundColor3" }) end
+if themeElements and themeElements.AccentText then table.insert(themeElements.AccentText, { Object = epTypeBtn, Property = "TextColor3" }) end
+local epTypeCorner = Instance.new("UICorner"); epTypeCorner.CornerRadius = UDim.new(0, 4); epTypeCorner.Parent = epTypeBtn
+
+local epTimeBox = Instance.new("TextBox")
+epTimeBox.Size = UDim2.new(1, -20, 0, 24); epTimeBox.Position = UDim2.new(0, 10, 0, 76); epTimeBox.BackgroundColor3 = activeTheme.Surface; epTimeBox.BorderSizePixel = 0; epTimeBox.Text = "0.0"; epTimeBox.PlaceholderText = "Hold/Wait Time (s)"; epTimeBox.TextColor3 = activeTheme.TextPrimary; epTimeBox.TextSize = 11; epTimeBox.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium); epTimeBox.Parent = editPanel
+if themeElements and themeElements.Surface then table.insert(themeElements.Surface, { Object = epTimeBox, Property = "BackgroundColor3" }) end
+if themeElements and themeElements.TextPrimary then table.insert(themeElements.TextPrimary, { Object = epTimeBox, Property = "TextColor3" }) end
+local epTimeCorner = Instance.new("UICorner"); epTimeCorner.CornerRadius = UDim.new(0, 4); epTimeCorner.Parent = epTimeBox
+
+local epMoveBtn = Instance.new("TextButton")
+epMoveBtn.Size = UDim2.new(0.45, 0, 0, 24); epMoveBtn.Position = UDim2.new(0, 10, 0, 108); epMoveBtn.BackgroundColor3 = activeTheme.Surface; epMoveBtn.BorderSizePixel = 0; epMoveBtn.Text = "📍 Move Here"; epMoveBtn.TextColor3 = activeTheme.TextPrimary; epMoveBtn.TextSize = 10; epMoveBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold); epMoveBtn.Parent = editPanel
+if themeElements and themeElements.Surface then table.insert(themeElements.Surface, { Object = epMoveBtn, Property = "BackgroundColor3" }) end
+if themeElements and themeElements.TextPrimary then table.insert(themeElements.TextPrimary, { Object = epMoveBtn, Property = "TextColor3" }) end
+local epMoveCorner = Instance.new("UICorner"); epMoveCorner.CornerRadius = UDim.new(0, 4); epMoveCorner.Parent = epMoveBtn
+
+local epDelBtn = Instance.new("TextButton")
+epDelBtn.Size = UDim2.new(0.45, 0, 0, 24); epDelBtn.Position = UDim2.new(0.55, -10, 0, 108); epDelBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40); epDelBtn.BorderSizePixel = 0; epDelBtn.Text = "🗑️ Delete"; epDelBtn.TextColor3 = Color3.fromRGB(255, 240, 240); epDelBtn.TextSize = 10; epDelBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold); epDelBtn.Parent = editPanel
+local epDelCorner = Instance.new("UICorner"); epDelCorner.CornerRadius = UDim.new(0, 4); epDelCorner.Parent = epDelBtn
+
+local epInsBtn = Instance.new("TextButton")
+epInsBtn.Size = UDim2.new(1, -20, 0, 26); epInsBtn.Position = UDim2.new(0, 10, 0, 140); epInsBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113); epInsBtn.BorderSizePixel = 0; epInsBtn.Text = "➕ Insert Node Here"; epInsBtn.TextColor3 = Color3.fromRGB(20, 50, 20); epInsBtn.TextSize = 11; epInsBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold); epInsBtn.Parent = editPanel
+local epInsCorner = Instance.new("UICorner"); epInsCorner.CornerRadius = UDim.new(0, 4); epInsCorner.Parent = epInsBtn
+
+local nearestNodeIdx = nil
+local lastInputType = "Walk"
+
+-- Proximity Scanner Thread
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        local wpTable = Waypoints or {}
+        local rec = isRecording or false
+        local play = isPlaying or false
+
+        if isEditMode and not rec and not play and #wpTable > 0 then
+            local pos = getEntityPosition()
+            if pos then
+                local minDist = math.huge
+                local nearest = 1
+                for i, wp in ipairs(wpTable) do
+                    local dist = (wp.pos - pos).Magnitude
+                    if dist < minDist then minDist = dist; nearest = i end
+                end
+                nearestNodeIdx = nearest
+                if setHaloTarget then setHaloTarget(wpTable[nearest].pos) end
+                
+                if not epTimeBox:IsFocused() then
+                    local node = wpTable[nearest]
+                    epNodeLabel.Text = string.format("Target: #%d / %d", nearest, #wpTable)
+                    
+                    if node.isInteractionNode or node.actionPromptName then
+                        epTypeBtn.Text = "Type: 🖲️ Prompt (E)"
+                        epTimeBox.Text = tostring(node.actionHoldDuration or 0)
+                        lastInputType = "Prompt"
+                    elseif node.isMouseClick then
+                        epTypeBtn.Text = "Type: 🖱️ Click (MB1)"
+                        epTimeBox.Text = tostring(node.clickDuration or 0)
+                        lastInputType = "Click"
+                    elseif node.jump then
+                        epTypeBtn.Text = "Type: ⬆️ Jump"
+                        epTimeBox.Text = tostring(node.pauseDuration or 0)
+                        lastInputType = "Jump"
+                    else
+                        epTypeBtn.Text = "Type: 🏃 Walk"
+                        epTimeBox.Text = tostring(node.pauseDuration or 0)
+                        lastInputType = "Walk"
+                    end
+                end
+                editPanel.Visible = true
+            end
+        elseif isEditMode and (#wpTable == 0 or rec or play) then
+            if setHaloTarget then setHaloTarget(nil) end
+            editPanel.Visible = false
+        end
+    end
+end)
+
+-- Button Interactions
+epTypeBtn.MouseButton1Click:Connect(function()
+    local wpTable = Waypoints or {}
+    if not nearestNodeIdx or not wpTable[nearestNodeIdx] then return end
+    local node = wpTable[nearestNodeIdx]
+    
+    if lastInputType == "Walk" then
+        node.jump = true; node.isInteractionNode = false; node.isMouseClick = false; lastInputType = "Jump"
+    elseif lastInputType == "Jump" then
+        node.jump = false; node.isInteractionNode = true; node.isMouseClick = false
+        node.actionHoldDuration = node.actionHoldDuration or 1.0
+        local cam = workspace.CurrentCamera
+        node.promptPos = getEntityPosition() + (cam and (cam.CFrame.LookVector * 3.5) or Vector3.zero)
+        lastInputType = "Prompt"
+    elseif lastInputType == "Prompt" then
+        node.jump = false; node.isInteractionNode = false; node.isMouseClick = true
+        node.clickDuration = node.clickDuration or 0.1; lastInputType = "Click"
+    else
+        node.jump = false; node.isInteractionNode = false; node.isMouseClick = false; lastInputType = "Walk"
+    end
+    if renderVisualPath then renderVisualPath(wpTable) end
+    playSoundFeedback(1.0)
+end)
+
+epTimeBox.FocusLost:Connect(function()
+    local wpTable = Waypoints or {}
+    if not nearestNodeIdx or not wpTable[nearestNodeIdx] then return end
+    local node = wpTable[nearestNodeIdx]
+    local num = tonumber(epTimeBox.Text) or 0
+    if lastInputType == "Prompt" then node.actionHoldDuration = num
+    elseif lastInputType == "Click" then node.clickDuration = num
+    else node.pauseDuration = num end
+    if renderVisualPath then renderVisualPath(wpTable) end
+    playSoundFeedback(1.2)
+end)
+
+epMoveBtn.MouseButton1Click:Connect(function()
+    local wpTable = Waypoints or {}
+    if not nearestNodeIdx or not wpTable[nearestNodeIdx] then return end
+    local pos = getEntityPosition()
+    if pos then
+        wpTable[nearestNodeIdx].pos = pos
+        if wpTable[nearestNodeIdx].isInteractionNode then
+            local cam = workspace.CurrentCamera
+            wpTable[nearestNodeIdx].promptPos = pos + (cam and (cam.CFrame.LookVector * 3.5) or Vector3.zero)
+        end
+        if renderVisualPath then renderVisualPath(wpTable) end
+        playSoundFeedback(1.0)
+        if showToast then showToast("Node moved to your position.") end
+    end
+end)
+
+epDelBtn.MouseButton1Click:Connect(function()
+    local wpTable = Waypoints or {}
+    if not nearestNodeIdx or not wpTable[nearestNodeIdx] then return end
+    table.remove(wpTable, nearestNodeIdx)
+    if renderVisualPath then renderVisualPath(wpTable) end
+    if updateTelemetry then updateTelemetry(nil, #wpTable) end
+    playSoundFeedback(0.8)
+    if showToast then showToast("Node deleted.") end
+end)
+
+epInsBtn.MouseButton1Click:Connect(function()
+    local wpTable = Waypoints or {}
+    if not nearestNodeIdx then return end
+    local pos = getEntityPosition()
+    if pos then
+        local _, _, h = getCharacter()
+        local cam = workspace.CurrentCamera
+        local newNode = { pos = pos, jump = false, pauseDuration = 0, speed = h and h.WalkSpeed or 16, isSprinting = h and (h.WalkSpeed > 17) or false, delay = 0.1 }
+        
+        if lastInputType == "Prompt" then
+            newNode.isInteractionNode = true
+            newNode.actionHoldDuration = 1.0
+            newNode.promptPos = pos + (cam and (cam.CFrame.LookVector * 3.5) or Vector3.zero)
+        elseif lastInputType == "Jump" then newNode.jump = true
+        elseif lastInputType == "Click" then newNode.isMouseClick = true; newNode.clickDuration = 0.1 end
+        
+        table.insert(wpTable, nearestNodeIdx + 1, newNode)
+        if renderVisualPath then renderVisualPath(wpTable) end
+        if updateTelemetry then updateTelemetry(nil, #wpTable) end
+        playSoundFeedback(1.2)
+        if showToast then showToast("Node inserted.") end
+    end
+end)
+
 -- Global Control Hub
 _G.Autofarm_Control = {
     ToggleRecord = function(state)
@@ -2976,4 +3177,4 @@ _G.Autofarm_Control = {
     Keybinds = Keybinds
 }
 
-print("🚀 Autofarm V12.6 (Hardware Bridge & Interaction Suite) Loaded.")
+print("🚀 Autofarm V12.7 (Hardware Bridge & Interaction Suite) Loaded.")
