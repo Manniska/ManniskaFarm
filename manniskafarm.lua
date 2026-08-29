@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V13.5 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V13.6 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -157,7 +157,8 @@ local Config = {
     MiningFailsafeTimeout = 20,
     AutoSellEnabled = false,
     SellRouteFile = "SellRoute.json",
-    ReturnRouteFile = "ReturnRoute.json"
+    ReturnRouteFile = "ReturnRoute.json",
+    InventoryFullText = "cannot carry"
 }
 
 if writefile then
@@ -321,7 +322,7 @@ local bootSub = Instance.new("TextLabel")
 bootSub.Size = UDim2.new(1, 0, 0, 16)
 bootSub.Position = UDim2.new(0, 0, 0, 52)
 bootSub.BackgroundTransparency = 1
-bootSub.Text = "V13.5 • INITIALIZING SUBSYSTEMS"
+bootSub.Text = "V13.6 • INITIALIZING SUBSYSTEMS"
 bootSub.TextColor3 = Color3.fromRGB(0, 170, 255)
 bootSub.TextSize = 11
 bootSub.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -735,7 +736,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V13.5"
+    titleLabel.Text = "MANNISKAFARM V13.6"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -1625,6 +1626,44 @@ do
         Config.ReturnRouteFile = val
     end)
 
+    local function createTextInputRow(parent, name, placeholder, defaultText, order, onChange)
+        local row = Instance.new("Frame")
+        row.Name = name
+        row.LayoutOrder = order
+        row.Size = UDim2.new(1, 0, 0, 42)
+        row.BackgroundColor3 = activeTheme.Surface
+        row.BackgroundTransparency = 0.5
+        row.BorderSizePixel = 0
+        row.Parent = parent
+        registerElement("Surface", row, "BackgroundColor3")
+        
+        local rCorner = Instance.new("UICorner"); rCorner.CornerRadius = UDim.new(0, 8); rCorner.Parent = row
+        local rStroke = Instance.new("UIStroke"); rStroke.Thickness = 1; rStroke.Color = activeTheme.Border; rStroke.Transparency = 0.5; rStroke.Parent = row
+        registerElement("Border", rStroke, "Color")
+        
+        local icon = Instance.new("TextLabel")
+        icon.Size = UDim2.new(0, 30, 1, 0); icon.Position = UDim2.new(0, 10, 0, 0)
+        icon.BackgroundTransparency = 1; icon.Text = "✏️"
+        icon.TextColor3 = activeTheme.TextPrimary; icon.TextSize = 14; icon.Parent = row
+        
+        local input = Instance.new("TextBox")
+        input.Size = UDim2.new(1, -50, 1, 0); input.Position = UDim2.new(0, 40, 0, 0)
+        input.BackgroundTransparency = 1; input.Text = defaultText
+        input.PlaceholderText = placeholder; input.TextColor3 = activeTheme.TextPrimary
+        input.TextSize = 11; input.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium)
+        input.TextXAlignment = Enum.TextXAlignment.Left; input.ClearTextOnFocus = false; input.Parent = row
+        registerElement("TextPrimary", input, "TextColor3")
+        
+        input.FocusLost:Connect(function()
+            if onChange then onChange(input.Text) end
+        end)
+        return row
+    end
+
+    createTextInputRow(miningPage, "InvFullInput", "Custom Inventory Full Alert Text", Config.InventoryFullText, 9, function(val)
+        Config.InventoryFullText = val
+    end)
+
     -- --- SETTINGS PAGE ---
     createSectionHeader(settingsPage, "Playback & Scaling", 1)
 
@@ -2305,6 +2344,7 @@ renderVisualPath = function(waypointsList)
 
         if i == 1 then node.Color3 = Color3.fromRGB(0, 255, 128)
         elseif i == #waypointsList then node.Color3 = Color3.fromRGB(255, 60, 60)
+        elseif data.isMineNode then node.Color3 = Color3.fromRGB(255, 120, 0)
         elseif data.action or data.actionPromptName or data.isInteractionNode then node.Color3 = Color3.fromRGB(0, 170, 255)
         elseif data.pauseDuration and data.pauseDuration > 0.5 then node.Color3 = Color3.fromRGB(255, 215, 0)
         elseif data.jump then node.Color3 = Color3.fromRGB(255, 170, 0)
@@ -2318,6 +2358,7 @@ renderVisualPath = function(waypointsList)
             
             if i == 1 then lblObj.Tag.Text = "[START]"; lblObj.Tag.TextColor3 = Color3.fromRGB(0, 255, 128)
             elseif i == #waypointsList then lblObj.Tag.Text = "[END]"; lblObj.Tag.TextColor3 = Color3.fromRGB(255, 80, 80)
+            elseif data.isMineNode then lblObj.Tag.Text = "[⛏️ MINE]"; lblObj.Tag.TextColor3 = Color3.fromRGB(255, 150, 50)
             elseif data.action or data.actionPromptName or data.isInteractionNode then lblObj.Tag.Text = string.format("[E %.1fs]", data.actionHoldDuration or 0); lblObj.Tag.TextColor3 = Color3.fromRGB(0, 200, 255)
             elseif data.pauseDuration and data.pauseDuration > 0.5 then lblObj.Tag.Text = string.format("[%.1fs]", data.pauseDuration); lblObj.Tag.TextColor3 = Color3.fromRGB(255, 215, 0)
             else lblObj.Tag.Text = tostring(i); lblObj.Tag.TextColor3 = Color3.fromRGB(255, 255, 255) end
@@ -2673,7 +2714,7 @@ local function executeMiningNode(data, root)
     end
     if camera then camera.CFrame = CFrame.lookAt(camera.CFrame.Position, targetPosition) end
 
-    -- Phase 0: Auto-Equip Tool in Slot 4
+    -- Phase 0: Auto-Equip Pickaxe (Slot 4)
     if VirtualInputManager then
         pcall(function()
             VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Four, false, game)
@@ -2681,7 +2722,7 @@ local function executeMiningNode(data, root)
             VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Four, false, game)
         end)
     end
-    task.wait(0.6) -- Wait for the equip animation to finish
+    task.wait(0.6) -- Wait for the draw animation to finish
 
     -- Phase 1: Start Swinging (VIM handles Mouse1 best for mining)
     if VirtualInputManager then
@@ -2932,10 +2973,13 @@ end
 -- AUTO-SELL & BREADCRUMB BACKTRACKING SYSTEM
 -- =====================================================================
 local function checkInventoryFull()
+    if not Config.AutoSellEnabled then return false end
+    local customTrigger = string.lower(Config.InventoryFullText or "inventory full")
+    
     for _, desc in ipairs(playerGui:GetDescendants()) do
         if desc:IsA("TextLabel") and desc.Visible then
             local txt = string.lower(desc.Text)
-            if string.find(txt, "inventory full") or string.find(txt, "backpack full") or string.find(txt, "bag is full") or string.find(txt, "cannot carry") then
+            if string.find(txt, "inventory full") or string.find(txt, "backpack full") or (customTrigger ~= "" and string.find(txt, customTrigger)) then
                 return true
             end
         end
@@ -3671,4 +3715,4 @@ for _, item in ipairs(mainFrame:GetDescendants()) do
 end
 mainFrame.BackgroundTransparency = 0.15
 
-print("🚀 Autofarm V13.5 (Smart Mine + Auto-Sell) Loaded.")
+print("🚀 Autofarm V13.6 (Smart Mine + Auto-Sell) Loaded.")
