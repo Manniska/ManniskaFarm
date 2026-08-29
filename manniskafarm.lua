@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V13.9 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V14.0 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -322,7 +322,7 @@ local bootSub = Instance.new("TextLabel")
 bootSub.Size = UDim2.new(1, 0, 0, 16)
 bootSub.Position = UDim2.new(0, 0, 0, 52)
 bootSub.BackgroundTransparency = 1
-bootSub.Text = "V13.9 • INITIALIZING SUBSYSTEMS"
+bootSub.Text = "V14.0 • INITIALIZING SUBSYSTEMS"
 bootSub.TextColor3 = Color3.fromRGB(0, 170, 255)
 bootSub.TextSize = 11
 bootSub.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -742,7 +742,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V13.9"
+    titleLabel.Text = "MANNISKAFARM V14.0"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -1895,13 +1895,17 @@ do
                     
                     if not Waypoints then Waypoints = {} end
                     
-                    -- Node Vacuum: Erase the previous node if it was just you standing still aiming
-                    if #Waypoints > 0 then
+                    -- Super Node Vacuum: Erase all previous pause nodes created while standing and aiming
+                    while #Waypoints > 0 do
                         local prevNode = Waypoints[#Waypoints]
                         if not prevNode.action and not prevNode.isInteractionNode and not prevNode.jump and not prevNode.isMineNode then
                             if (prevNode.pauseDuration and prevNode.pauseDuration > 0) or (prevNode.pos - pos).Magnitude < 4.0 then
                                 table.remove(Waypoints, #Waypoints)
+                            else
+                                break
                             end
+                        else
+                            break
                         end
                     end
                     
@@ -2747,53 +2751,44 @@ local function executeMiningNode(data, root)
         pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0) end)
     end
     
-    local manualTimer = data.actionHoldDuration or 12.0 -- Fallback bumped to 12s
+    local manualTimer = data.actionHoldDuration or 12.0
 
     if Config.SmartMiningEnabled then
-        -- SMART BRANCH: Throttled Pulse Scanner (Zero Lag)
+        -- SMART BRANCH: Two-Stage Multi-Chunk Scanner (Zero Lag)
         local timeOut = tick() + Config.MiningFailsafeTimeout
-        local uiGracePeriod = tick() + 5.0 -- 5s to hit the rock and spawn the UI
-        local cachedProgressBar = nil
-        local lostUITime = nil
+        local uiGracePeriod = tick() + 1.5 -- Stage 1: 1.5s to hit rock. If empty, skips instantly.
+        local sawUI = false
+        local noUITime = tick()
 
         while isPlaying and tick() < timeOut do
-            -- Re-orient to face the rock in case of drift
-            if root and targetPosition then
-                root.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetPosition.X, root.Position.Y, targetPosition.Z))
-            end
-
-            if not cachedProgressBar then
-                -- Throttle the search to avoid lag
-                for _, desc in ipairs(playerGui:GetDescendants()) do
-                    if desc:IsA("TextLabel") and desc.Visible then
-                        local text = string.lower(desc.Text)
-                        if string.find(text, "%%") or string.find(text, "deposit") or string.find(text, "ore") or string.find(text, "rock") then
-                            cachedProgressBar = desc
-                            break
-                        end
-                    end
-                end
-
-                if not cachedProgressBar and tick() > uiGracePeriod then
-                    showToast("Ghost Rock (No UI). Moving on.")
-                    break
-                end
-                task.wait(0.25) -- Safe throttle
-            else
-                -- UI Locked On: Monitor it dynamically until it breaks
-                if cachedProgressBar.Parent and cachedProgressBar.Visible and cachedProgressBar.AbsoluteSize.X > 0 then
-                    lostUITime = nil -- UI is visible, reset exhaustion clock
-                else
-                    if not lostUITime then
-                        lostUITime = tick()
-                    elseif (tick() - lostUITime) >= 1.5 then
-                        -- UI has been gone for 1.5s. Rock is fully broken.
-                        showToast("⛏️ Rock mined completely!")
+            local foundBar = false
+            -- Throttle the search to completely eliminate FPS lag
+            for _, desc in ipairs(playerGui:GetDescendants()) do
+                if desc:IsA("TextLabel") and desc.Visible then
+                    local text = string.lower(desc.Text)
+                    if string.find(text, "%%") or string.find(text, "deposit") or string.find(text, "ore") or string.find(text, "rock") then
+                        foundBar = true
                         break
                     end
                 end
-                task.wait(0.1) -- Ultra-lightweight status check
             end
+
+            if foundBar then
+                sawUI = true
+                noUITime = tick()
+            else
+                if sawUI then
+                    -- Stage 2: Rock vanished: 3.5s tolerance to handle multi-chunk ore respawning
+                    if (tick() - noUITime) >= 3.5 then 
+                        showToast("⛏️ Rock mined completely!")
+                        break 
+                    end
+                elseif tick() > uiGracePeriod then
+                    showToast("Rock Empty. Skipping...")
+                    break 
+                end
+            end
+            task.wait(0.25) -- Safe throttle
         end
     else
         -- MANUAL BRANCH: Blind Swing Timer
@@ -3195,7 +3190,8 @@ startPlayback = function()
                             dynamicRoot.AssemblyLinearVelocity = Vector3.new(dynamicRoot.AssemblyLinearVelocity.X, -10, dynamicRoot.AssemblyLinearVelocity.Z)
                         end
 
-                        if Config.AutoUnstuckEnabled or timeout > 1.2 then
+                        -- Only override with jumping if strictly enabled by user
+                        if Config.AutoUnstuckEnabled then
                             stuckClock = stuckClock + 0.03
                             if stuckClock >= 0.5 then
                                 local moved = (curPos - checkPos).Magnitude
@@ -3752,4 +3748,4 @@ for _, item in ipairs(mainFrame:GetDescendants()) do
 end
 mainFrame.BackgroundTransparency = 0.15
 
-print("🚀 Autofarm V13.9 (Smart Mine + Auto-Sell) Loaded.")
+print("🚀 Autofarm V14.0 (Smart Mine + Auto-Sell) Loaded.")
