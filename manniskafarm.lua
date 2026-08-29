@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V14.5 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V14.6 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -322,7 +322,7 @@ local bootSub = Instance.new("TextLabel")
 bootSub.Size = UDim2.new(1, 0, 0, 16)
 bootSub.Position = UDim2.new(0, 0, 0, 52)
 bootSub.BackgroundTransparency = 1
-bootSub.Text = "V14.5 • INITIALIZING SUBSYSTEMS"
+bootSub.Text = "V14.6 • INITIALIZING SUBSYSTEMS"
 bootSub.TextColor3 = Color3.fromRGB(0, 170, 255)
 bootSub.TextSize = 11
 bootSub.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -742,7 +742,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V14.5"
+    titleLabel.Text = "MANNISKAFARM V14.6"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -2708,7 +2708,7 @@ task.spawn(function()
 end)
 
 -- =====================================================================
--- HYBRID MINING ENGINE (WORKSPACE MODEL CHUNKING + HUMANIZED SWING)
+-- HYBRID MINING ENGINE (HUMANIZED SWING + EXPLICIT "NO ORE" CHECK)
 -- =====================================================================
 local function executeMiningNode(data, root)
     local targetPosition = data.promptPos or data.pos
@@ -2735,52 +2735,38 @@ local function executeMiningNode(data, root)
     local manualTimer = data.actionHoldDuration or 15.0
 
     if Config.SmartMiningEnabled then
-        -- SMART BRANCH: Workspace Model Proximity & Humanized Click Rhythm
+        -- SMART BRANCH: Humanized Swing + Explicit "No ore remaining!" Check
         local timeOut = tick() + Config.MiningFailsafeTimeout
-        local uiGracePeriod = tick() + 3.0
 
         while isPlaying and tick() < timeOut do
             -- 1. Humanized Swing (Bypasses the 600s Anti-Cheat Cooldown)
             if VirtualInputManager then
                 pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0) end)
-                task.wait(0.1) -- Hold mouse briefly
+                task.wait(0.1) -- Hold mouse briefly for a realistic click
                 pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0) end)
             end
 
-            -- 2. Zero-Lag Workspace Inspector (Fixes FPS Drops & Early Exits)
-            local rockBaseExists = false
-            local activeOreExists = false
-            local depositFound = false
-
-            for _, obj in ipairs(workspace:GetChildren()) do
-                if obj:IsA("Model") and (string.lower(obj.Name) == "oredeposit" or string.find(string.lower(obj.Name), "deposit")) then
-                    local primary = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
-                    if primary and (primary.Position - targetPosition).Magnitude < 10.0 then
-                        depositFound = true
-                        -- Check internal chunks based on F9 Diagnostic data
-                        for _, part in ipairs(obj:GetChildren()) do
-                            if part:IsA("BasePart") then
-                                local pName = string.lower(part.Name)
-                                if string.find(pName, "base") then rockBaseExists = true end
-                                if string.find(pName, "ore") then activeOreExists = true end
-                            end
-                        end
-                        break -- Found our specific rock, stop looping workspace
+            -- 2. Zero-Lag UI Scanner (Runs only once per swing during the cooldown)
+            local isDepleted = false
+            for _, desc in ipairs(playerGui:GetDescendants()) do
+                if desc:IsA("TextLabel") and desc.Visible then
+                    local text = string.lower(desc.Text)
+                    -- Explicitly hunt for the red completion text
+                    if string.find(text, "no ore remaining") then
+                        isDepleted = true
+                        break
                     end
                 end
             end
 
             -- 3. Absolute Depletion Logic
-            if depositFound and rockBaseExists and not activeOreExists then
-                showToast("⛏️ Rock completely depleted (Only RockBase left)!")
-                break
-            elseif not depositFound and tick() > uiGracePeriod then
-                showToast("Rock missing/empty on arrival. Skipping...")
+            if isDepleted then
+                showToast("⛏️ Rock completely depleted ('No ore remaining!')")
                 break
             end
 
-            -- Humanized swing cooldown (0.7s between clicks)
-            task.wait(0.7)
+            -- Humanized swing cooldown (0.65s wait ensures we don't swing too fast and tanks 0 FPS)
+            task.wait(0.65)
         end
     else
         -- MANUAL BRANCH: Blind Swing Timer with Humanized rhythm
@@ -2797,7 +2783,7 @@ local function executeMiningNode(data, root)
                 pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0) end)
             end
             
-            task.wait(0.7)
+            task.wait(0.65)
         end
     end
 
@@ -3684,4 +3670,4 @@ for _, item in ipairs(mainFrame:GetDescendants()) do
 end
 mainFrame.BackgroundTransparency = 0.15
 
-print("🚀 Autofarm V14.5 (Smart Mine + Auto-Sell) Loaded.")
+print("🚀 Autofarm V14.6 (Smart Mine + Auto-Sell) Loaded.")
