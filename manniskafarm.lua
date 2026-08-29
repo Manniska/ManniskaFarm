@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V13.2 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V13.3 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -310,7 +310,7 @@ local bootSub = Instance.new("TextLabel")
 bootSub.Size = UDim2.new(1, 0, 0, 20)
 bootSub.Position = UDim2.new(0, 0, 0.4, 0)
 bootSub.BackgroundTransparency = 1
-bootSub.Text = "V13.2 • INITIALIZING SUBSYSTEMS"
+bootSub.Text = "V13.3 • INITIALIZING SUBSYSTEMS"
 bootSub.TextColor3 = Color3.fromRGB(0, 170, 255)
 bootSub.TextSize = 12
 bootSub.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -724,7 +724,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V13.2"
+    titleLabel.Text = "MANNISKAFARM V13.3"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -2361,17 +2361,19 @@ local function hookJumpListeners()
         end
     end)
 
-    -- Capture manual 'E' interactions during recording
+    -- Capture manual 'E' and 'F' interactions during recording
     keyConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if isRecording and input.KeyCode == Enum.KeyCode.E then
+        if isRecording and (input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.F) then
             holdStartTick = tick()
+            _lastRecordedKey = input.KeyCode
         end
     end)
 
     keyEndConnection = UserInputService.InputEnded:Connect(function(input)
-        if isRecording and input.KeyCode == Enum.KeyCode.E and holdStartTick then
+        if isRecording and (input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.F) and holdStartTick then
             local rawDuration = tick() - holdStartTick
             local finalDuration = math.max(rawDuration, 0.2)
+            local targetKey = _lastRecordedKey or Enum.KeyCode.E
             holdStartTick = nil
 
             local pos = getEntityPosition()
@@ -2389,6 +2391,7 @@ local function hookJumpListeners()
                 speed = h and h.WalkSpeed or 16,
                 isSprinting = h and (h.WalkSpeed > 17) or false,
                 isInteractionNode = true,
+                interactionKey = targetKey.Name,
                 actionHoldDuration = math.floor((finalDuration + 0.25) * 10) / 10,
                 interactionCount = 1,
                 interClickDelay = 0.2,
@@ -2397,7 +2400,7 @@ local function hookJumpListeners()
             lastWaypointTime = now
             updateTelemetry(nil, #Waypoints)
             if Config.RealtimeVisualizer then renderVisualPath(Waypoints) end
-            showToast(string.format("Interaction Stamped (%.1fs)", finalDuration))
+            showToast(string.format("Interaction [%s] Stamped (%.1fs)", targetKey.Name, finalDuration))
         end
     end)
     table.insert(scriptConnections, keyEndConnection)
@@ -2771,12 +2774,15 @@ local function resolveAndTriggerPrompt(data, root)
     for count = 1, totalTimes do
         if not isPlaying then break end
 
-        print(string.format("📡 [ManniskaFarm] Dispatching HOLD_E:%d to Macro...", holdTimeMs))
-        sendExternalMacroCommand("E", holdTimeMs)
+        local targetKeyName = data.interactionKey or "E"
+        local keyCodeEnum = Enum.KeyCode[targetKeyName] or Enum.KeyCode.E
+
+        print(string.format("📡 [ManniskaFarm] Dispatching HOLD_%s:%d to Macro...", targetKeyName, holdTimeMs))
+        sendExternalMacroCommand(targetKeyName, holdTimeMs)
 
         if VirtualInputManager then
             pcall(function()
-                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                VirtualInputManager:SendKeyEvent(true, keyCodeEnum, false, game)
             end)
         end
 
@@ -2797,7 +2803,7 @@ local function resolveAndTriggerPrompt(data, root)
 
         if VirtualInputManager then
             pcall(function()
-                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                VirtualInputManager:SendKeyEvent(false, keyCodeEnum, false, game)
             end)
         end
 
@@ -3234,6 +3240,7 @@ copyRouteToClipboard = function()
             isMineNode = wp.isMineNode or false,
             exhaustionCount = wp.exhaustionCount or 1,
             isInteractionNode = wp.isInteractionNode or false,
+            interactionKey = wp.interactionKey or "E",
             interactionCount = wp.interactionCount or 1,
             interClickDelay = wp.interClickDelay or 0.15,
             actionHoldDuration = wp.actionHoldDuration or 0,
@@ -3271,6 +3278,7 @@ saveRouteToFile = function(fileName)
             isMineNode = wp.isMineNode or false,
             exhaustionCount = wp.exhaustionCount or 1,
             isInteractionNode = wp.isInteractionNode or false,
+            interactionKey = wp.interactionKey or "E",
             interactionCount = wp.interactionCount or 1,
             interClickDelay = wp.interClickDelay or 0.15,
             actionHoldDuration = wp.actionHoldDuration or 0,
@@ -3313,6 +3321,7 @@ loadRouteFromFile = function(fileName)
                 isMineNode = rawWp.isMineNode or false,
                 exhaustionCount = rawWp.exhaustionCount or 1,
                 isInteractionNode = rawWp.isInteractionNode or false,
+                interactionKey = rawWp.interactionKey or "E",
                 interactionCount = rawWp.interactionCount or 1,
                 interClickDelay = rawWp.interClickDelay or 0.15,
                 actionHoldDuration = rawWp.actionHoldDuration or 0,
@@ -3631,4 +3640,4 @@ for _, item in ipairs(mainFrame:GetDescendants()) do
 end
 mainFrame.BackgroundTransparency = 0.15
 
-print("🚀 Autofarm V13.2 (Smart Mine + Auto-Sell) Loaded.")
+print("🚀 Autofarm V13.3 (Smart Mine + Auto-Sell) Loaded.")
