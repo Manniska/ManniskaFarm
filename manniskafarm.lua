@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V12.8 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V13.1 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -283,6 +283,72 @@ screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = playerGui
 
+-- =====================================================================
+-- KINEMATIC BOOT SEQUENCE (LOADING SCREEN)
+-- =====================================================================
+local loadingFrame = Instance.new("Frame")
+loadingFrame.Name = "BootScreen"
+loadingFrame.Size = UDim2.new(1, 0, 1, 0)
+loadingFrame.BackgroundColor3 = Color3.fromRGB(12, 14, 18)
+loadingFrame.BorderSizePixel = 0
+loadingFrame.ZIndex = 100
+loadingFrame.Parent = screenGui
+
+local bootLogo = Instance.new("TextLabel")
+bootLogo.Size = UDim2.new(1, 0, 0, 40)
+bootLogo.Position = UDim2.new(0, 0, 0.4, -40)
+bootLogo.BackgroundTransparency = 1
+bootLogo.Text = "MANNISKA KINEMATICS"
+bootLogo.TextColor3 = Color3.fromRGB(240, 245, 255)
+bootLogo.TextSize = 24
+bootLogo.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Heavy)
+bootLogo.Parent = loadingFrame
+
+local bootSub = Instance.new("TextLabel")
+bootSub.Size = UDim2.new(1, 0, 0, 20)
+bootSub.Position = UDim2.new(0, 0, 0.4, 0)
+bootSub.BackgroundTransparency = 1
+bootSub.Text = "V13.1 • INITIALIZING SUBSYSTEMS"
+bootSub.TextColor3 = Color3.fromRGB(0, 170, 255)
+bootSub.TextSize = 12
+bootSub.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+bootSub.Parent = loadingFrame
+
+local loadBarBg = Instance.new("Frame")
+loadBarBg.Size = UDim2.new(0, 300, 0, 4)
+loadBarBg.Position = UDim2.new(0.5, -150, 0.4, 40)
+loadBarBg.BackgroundColor3 = Color3.fromRGB(30, 35, 45)
+loadBarBg.BorderSizePixel = 0
+loadBarBg.Parent = loadingFrame
+
+local loadBarCorner = Instance.new("UICorner"); loadBarCorner.CornerRadius = UDim.new(1, 0); loadBarCorner.Parent = loadBarBg
+
+local loadBarFill = Instance.new("Frame")
+loadBarFill.Size = UDim2.new(0, 0, 1, 0)
+loadBarFill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+loadBarFill.BorderSizePixel = 0
+loadBarFill.Parent = loadBarBg
+
+local loadFillCorner = Instance.new("UICorner"); loadFillCorner.CornerRadius = UDim.new(1, 0); loadFillCorner.Parent = loadBarFill
+
+local bootLog = Instance.new("TextLabel")
+bootLog.Size = UDim2.new(1, 0, 0, 20)
+bootLog.Position = UDim2.new(0, 0, 0.4, 55)
+bootLog.BackgroundTransparency = 1
+bootLog.Text = "Mounting Virtual Input Manager..."
+bootLog.TextColor3 = Color3.fromRGB(140, 150, 170)
+bootLog.TextSize = 11
+bootLog.FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Medium)
+bootLog.Parent = loadingFrame
+
+local function updateLoadPhase(progress, message)
+    bootLog.Text = message
+    TweenService:Create(loadBarFill, TweenInfo.new(0.3, Enum.EasingStyle.Sine), { Size = UDim2.new(progress, 0, 1, 0) }):Play()
+    task.wait(0.3) -- Yields the script slightly to ensure UI renders the loading phases
+end
+
+updateLoadPhase(0.15, "Injecting Custom Theme Palettes...")
+
 local themeElements = {
     Background = {},
     Surface = {},
@@ -397,6 +463,8 @@ end
 
 -- Scoped UI Construction (Fixes Register Limit 200)
 do
+    updateLoadPhase(0.35, "Constructing Error & Diagnostic Handlers...")
+
     errorModal = Instance.new("Frame")
     errorModal.Name = "ErrorModal"
     errorModal.Size = UDim2.new(0, 360, 0, 140)
@@ -580,6 +648,8 @@ do
     table.insert(scriptConnections, hudMoveConn)
 
     -- Main Window
+    updateLoadPhase(0.55, "Building Main UI Window & Telemetry...")
+
     mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainWindow"
     mainFrame.Size = UDim2.new(0, 440, 0, 520)
@@ -652,7 +722,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V12.8"
+    titleLabel.Text = "MANNISKAFARM V13.1"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -1500,6 +1570,48 @@ do
         Config.AutoSellEnabled = state
     end, 6, Config.AutoSellEnabled)
 
+    local function createRouteInputRow(parent, name, placeholder, defaultText, order, onChange)
+        local row = Instance.new("Frame")
+        row.Name = name
+        row.LayoutOrder = order
+        row.Size = UDim2.new(1, 0, 0, 42)
+        row.BackgroundColor3 = activeTheme.Surface
+        row.BackgroundTransparency = 0.5
+        row.BorderSizePixel = 0
+        row.Parent = parent
+        registerElement("Surface", row, "BackgroundColor3")
+        
+        local rCorner = Instance.new("UICorner"); rCorner.CornerRadius = UDim.new(0, 8); rCorner.Parent = row
+        local rStroke = Instance.new("UIStroke"); rStroke.Thickness = 1; rStroke.Color = activeTheme.Border; rStroke.Transparency = 0.5; rStroke.Parent = row
+        registerElement("Border", rStroke, "Color")
+        
+        local icon = Instance.new("TextLabel")
+        icon.Size = UDim2.new(0, 30, 1, 0); icon.Position = UDim2.new(0, 10, 0, 0)
+        icon.BackgroundTransparency = 1; icon.Text = "📁"
+        icon.TextColor3 = activeTheme.TextPrimary; icon.TextSize = 14; icon.Parent = row
+        
+        local input = Instance.new("TextBox")
+        input.Size = UDim2.new(1, -50, 1, 0); input.Position = UDim2.new(0, 40, 0, 0)
+        input.BackgroundTransparency = 1; input.Text = defaultText
+        input.PlaceholderText = placeholder; input.TextColor3 = activeTheme.Accent
+        input.TextSize = 11; input.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium)
+        input.TextXAlignment = Enum.TextXAlignment.Left; input.ClearTextOnFocus = false; input.Parent = row
+        registerElement("AccentText", input, "TextColor3")
+        
+        input.FocusLost:Connect(function()
+            if onChange then onChange(input.Text) end
+        end)
+        return row
+    end
+
+    createRouteInputRow(miningPage, "SellRouteInput", "Sell Route Filename (.json)", Config.SellRouteFile, 7, function(val)
+        Config.SellRouteFile = val
+    end)
+
+    createRouteInputRow(miningPage, "ReturnRouteInput", "Return Route Filename (.json)", Config.ReturnRouteFile, 8, function(val)
+        Config.ReturnRouteFile = val
+    end)
+
     -- --- SETTINGS PAGE ---
     createSectionHeader(settingsPage, "Playback & Scaling", 1)
 
@@ -2110,6 +2222,8 @@ do
     table.insert(scriptConnections, resizeChangeConn)
 end
 
+updateLoadPhase(0.85, "Establishing Hardware Bridge Protocols...")
+
 -- Telemetry Function
 local currentLoopCount = 0
 updateTelemetry = function(currentNode, totalNodes)
@@ -2494,6 +2608,115 @@ task.spawn(function()
     end
 end)
 
+-- =====================================================================
+-- HYBRID MINING ENGINE (SMART UI + MANUAL FALLBACK)
+-- =====================================================================
+local function executeMiningNode(data, root)
+    local targetPosition = data.promptPos or data.pos
+    local camera = workspace.CurrentCamera
+    local _, _, hum = getCharacter()
+
+    if hum then hum:Move(Vector3.zero, false) end
+    if root then 
+        root.AssemblyLinearVelocity = Vector3.zero 
+        root.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetPosition.X, root.Position.Y, targetPosition.Z))
+    end
+    if camera then camera.CFrame = CFrame.lookAt(camera.CFrame.Position, targetPosition) end
+
+    -- Phase 1: Start Swinging (VIM handles Mouse1 best for mining)
+    if VirtualInputManager then
+        pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0) end)
+    end
+    
+    local manualTimer = data.actionHoldDuration or 8.5 -- Default fallback time
+
+    if Config.SmartMiningEnabled then
+        -- SMART BRANCH: Scan PlayerGui for Damage Bars
+        local timeOut = tick() + Config.MiningFailsafeTimeout
+        local uiGracePeriod = tick() + 2.0
+        local sawUI = false
+        local noUITime = tick()
+
+        while isPlaying and tick() < timeOut do
+            local foundBar = false
+            for _, desc in ipairs(playerGui:GetDescendants()) do
+                if desc:IsA("Frame") or desc:IsA("TextLabel") then
+                    local name = string.lower(desc.Name)
+                    local text = desc:IsA("TextLabel") and string.lower(desc.Text) or ""
+                    if (string.find(name, "progress") or string.find(name, "mine") or string.find(text, "mining")) and desc.Visible and desc.AbsoluteSize.X > 0 then
+                        foundBar = true
+                        break
+                    end
+                end
+            end
+
+            if foundBar then
+                sawUI = true
+                noUITime = tick() -- Reset the exhaustion tolerance stopwatch
+            else
+                if sawUI then
+                    if (tick() - noUITime) >= 0.75 then
+                        break -- Rock is officially broken (Exhaustion flicker surpassed)
+                    end
+                elseif tick() > uiGracePeriod then
+                    break -- Ghost Rock (UI never appeared, skip node)
+                end
+            end
+            RunService.RenderStepped:Wait()
+        end
+    else
+        -- MANUAL BRANCH: Blind Swing Timer
+        showToast(string.format("Blind Mining: %.1fs", manualTimer))
+        local swingStart = tick()
+        while isPlaying and (tick() - swingStart) < manualTimer do
+            RunService.RenderStepped:Wait()
+        end
+    end
+
+    -- Phase 2: Release Swing
+    if VirtualInputManager then
+        pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0) end)
+    end
+    task.wait(0.2)
+
+    -- Phase 3: Auto-Loot Sweeper (15-stud radius)
+    if not isPlaying then return end
+    if Config.AutoLootGems and root then
+        local rootPos = root.Position
+        local bestGem = nil
+        local bestDist = 15
+
+        for _, obj in ipairs(workspace:GetChildren()) do
+            if obj:IsA("Model") or obj:IsA("BasePart") then
+                local p = obj:IsA("Model") and obj.PrimaryPart and obj.PrimaryPart.Position or (obj:IsA("BasePart") and obj.Position or nil)
+                if p then
+                    local dist = (p - rootPos).Magnitude
+                    if dist < bestDist and (string.find(string.lower(obj.Name), "gem") or string.find(string.lower(obj.Name), "ore") or string.find(string.lower(obj.Name), "loot")) then
+                        bestDist = dist
+                        bestGem = p
+                    end
+                end
+            end
+        end
+
+        if bestGem then
+            showToast("💎 Rare Gem Detected! Looting...")
+            if camera then camera.CFrame = CFrame.lookAt(camera.CFrame.Position, bestGem) end
+            for _ = 1, 3 do
+                sendExternalMacroCommand("E", 100)
+                if VirtualInputManager then 
+                    pcall(function() 
+                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                        task.wait(0.05)
+                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game) 
+                    end) 
+                end
+                task.wait(0.1)
+            end
+        end
+    end
+end
+
 -- Hardware Prompt & ObjectAction Resolver
 local function resolveAndTriggerPrompt(data, root)
     local targetPosition = data.promptPos or data.pos
@@ -2642,6 +2865,69 @@ local function navigateToPoint(targetPosition, maxSpeed)
     return true
 end
 
+-- =====================================================================
+-- AUTO-SELL & BREADCRUMB BACKTRACKING SYSTEM
+-- =====================================================================
+local function checkInventoryFull()
+    for _, desc in ipairs(playerGui:GetDescendants()) do
+        if desc:IsA("TextLabel") and desc.Visible then
+            local txt = string.lower(desc.Text)
+            if string.find(txt, "inventory full") or string.find(txt, "backpack full") or string.find(txt, "bag is full") or string.find(txt, "cannot carry") then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function executeSubRoute(routeName)
+    -- Exploit Lua's reference system to perfectly backup the Main Route
+    local backupWaypoints = Waypoints
+    loadRouteFromFile(routeName)
+    
+    if #Waypoints == 0 then
+        showToast("Sub-route empty or missing: " .. routeName)
+        Waypoints = backupWaypoints
+        renderVisualPath(Waypoints)
+        return false
+    end
+
+    -- Run the loaded sub-route start to finish
+    for idx, subData in ipairs(Waypoints) do
+        if not isPlaying then break end
+        updateTelemetry(idx, #Waypoints)
+        setHaloTarget(subData.pos)
+
+        local _, root, hum = getCharacter()
+        if not root then break end
+
+        if subData.isMineNode then
+            executeMiningNode(subData, root)
+        elseif subData.action or subData.actionPromptName or subData.isInteractionNode or subData.promptPos then
+            if hum then hum:MoveTo(root.Position) end
+            resolveAndTriggerPrompt(subData, root)
+        else
+            local speed = (hum and hum.WalkSpeed > 0 and hum.WalkSpeed) or 16
+            speed = speed * Config.SpeedMultiplier
+            navigateToPoint(subData.pos, speed)
+
+            if subData.pauseDuration and subData.pauseDuration > 0 then
+                task.wait(subData.pauseDuration / Config.SpeedMultiplier)
+            end
+
+            if subData.jump and hum then
+                hum.Jump = true
+                hum:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
+    end
+
+    -- Restore Main Route memory instantly
+    Waypoints = backupWaypoints
+    renderVisualPath(Waypoints)
+    return true
+end
+
 startPlayback = function()
     if isPlaying or #Waypoints == 0 then return end
     if isRecording then
@@ -2712,11 +2998,57 @@ startPlayback = function()
                     hum.WalkSpeed = 16 * Config.SpeedMultiplier * speedDrift
                 end
 
-                if Config.AutoTeleport and not data.action and not data.jump and not data.isInteractionNode then
+                if Config.AutoTeleport and not data.action and not data.jump and not data.isInteractionNode and not data.isMineNode then
                     curRoot.CFrame = CFrame.new(data.pos)
                     task.wait(0.02 / Config.SpeedMultiplier)
                 else
-                    if data.action or data.actionPromptName or data.isInteractionNode or data.promptPos then
+                    if data.isMineNode then
+                        executeMiningNode(data, curRoot)
+                        
+                        -- =========================================
+                        -- BREADCRUMB AUTO-SELL HOOK
+                        -- =========================================
+                        if Config.AutoSellEnabled and checkInventoryFull() then
+                            showToast("🎒 Backpack Full! Backtracking to Anchor...")
+                            
+                            -- 1. Reverse Traverse the Breadcrumbs safely
+                            for rev = i, 1, -1 do
+                                if not isPlaying then break end
+                                local revData = Waypoints[rev]
+                                setHaloTarget(revData.pos)
+                                local s = 16 * Config.SpeedMultiplier
+                                navigateToPoint(revData.pos, s)
+                                
+                                -- Jump if the original path required a jump over this terrain
+                                if revData.jump then
+                                    local _, _, h = getCharacter()
+                                    if h then
+                                        h.Jump = true
+                                        h:ChangeState(Enum.HumanoidStateType.Jumping)
+                                    end
+                                end
+                            end
+
+                            -- 2. Execute Sub-Routes
+                            if isPlaying then
+                                showToast("Executing Sell Route: " .. Config.SellRouteFile)
+                                executeSubRoute(Config.SellRouteFile)
+                            end
+
+                            if isPlaying then
+                                showToast("Executing Return Route: " .. Config.ReturnRouteFile)
+                                executeSubRoute(Config.ReturnRouteFile)
+                            end
+
+                            -- 3. Reset main loop index to seamlessly resume from Anchor
+                            if isPlaying then
+                                i = 1
+                                showToast("Resuming Main Mining Route.")
+                            end
+                        end
+                        -- =========================================
+
+                    elseif data.action or data.actionPromptName or data.isInteractionNode or data.promptPos then
                         if hum then hum:MoveTo(curRoot.Position) end
                         resolveAndTriggerPrompt(data, curRoot)
                     end
@@ -2873,6 +3205,8 @@ copyRouteToClipboard = function()
             speed = wp.speed or 16,
             isSprinting = wp.isSprinting or false,
             delay = wp.delay or 0.08,
+            isMineNode = wp.isMineNode or false,
+            exhaustionCount = wp.exhaustionCount or 1,
             isInteractionNode = wp.isInteractionNode or false,
             interactionCount = wp.interactionCount or 1,
             interClickDelay = wp.interClickDelay or 0.15,
@@ -2908,6 +3242,8 @@ saveRouteToFile = function(fileName)
             speed = wp.speed or 16,
             isSprinting = wp.isSprinting or false,
             delay = wp.delay or 0.08,
+            isMineNode = wp.isMineNode or false,
+            exhaustionCount = wp.exhaustionCount or 1,
             isInteractionNode = wp.isInteractionNode or false,
             interactionCount = wp.interactionCount or 1,
             interClickDelay = wp.interClickDelay or 0.15,
@@ -2948,6 +3284,8 @@ loadRouteFromFile = function(fileName)
                 isSprinting = rawWp.isSprinting or false,
                 delay = rawWp.delay,
                 action = nil,
+                isMineNode = rawWp.isMineNode or false,
+                exhaustionCount = rawWp.exhaustionCount or 1,
                 isInteractionNode = rawWp.isInteractionNode or false,
                 interactionCount = rawWp.interactionCount or 1,
                 interClickDelay = rawWp.interClickDelay or 0.15,
@@ -3208,4 +3546,40 @@ _G.Autofarm_Control = {
     Keybinds = Keybinds
 }
 
-print("🚀 Autofarm V12.8 (Hardware Bridge & Interaction Suite) Loaded.")
+-- Finalize Boot Sequence
+updateLoadPhase(1.0, "Boot Sequence Complete.")
+mainFrame.Visible = false
+mainFrame.BackgroundTransparency = 1
+for _, child in ipairs(mainFrame:GetChildren()) do
+    if child:IsA("Frame") or child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("ScrollingFrame") then
+        child.BackgroundTransparency = 1
+        if child:IsA("TextLabel") or child:IsA("TextButton") then child.TextTransparency = 1 end
+    end
+end
+
+TweenService:Create(loadingFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { BackgroundTransparency = 1 }):Play()
+for _, child in ipairs(loadingFrame:GetChildren()) do
+    if child:IsA("Frame") then
+        TweenService:Create(child, TweenInfo.new(0.4), { BackgroundTransparency = 1 }):Play()
+    elseif child:IsA("TextLabel") then
+        TweenService:Create(child, TweenInfo.new(0.4), { TextTransparency = 1 }):Play()
+    end
+end
+
+task.wait(0.6)
+loadingFrame:Destroy()
+
+-- Smooth fade in for Main UI
+mainFrame.Visible = true
+TweenService:Create(mainFrame, TweenInfo.new(0.4), { BackgroundTransparency = 0.15 }):Play()
+for _, child in ipairs(mainFrame:GetChildren()) do
+    if child:IsA("Frame") or child:IsA("ScrollingFrame") then
+        local t = child.Name == "Header" and 0.2 or 0
+        if child.Name == "Tabs" then t = 0.6 end
+        TweenService:Create(child, TweenInfo.new(0.4), { BackgroundTransparency = t }):Play()
+    elseif child:IsA("TextLabel") or child:IsA("TextButton") then
+        TweenService:Create(child, TweenInfo.new(0.4), { TextTransparency = 0 }):Play()
+    end
+end
+
+print("🚀 Autofarm V13.1 (Smart Mine + Auto-Sell) Loaded.")
