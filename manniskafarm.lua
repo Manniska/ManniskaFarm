@@ -1862,7 +1862,11 @@ do
             return
         end
 
-        -- Execute macro keybinds even if gameProcessed is true (bypasses map/chat conflicts)
+	-- Smart Text Filter: Safely ignore inputs if the user is typing in Chat or a TextBox
+        local isTyping = UserInputService:GetFocusedTextBox() ~= nil
+        if isTyping then return end
+
+        -- Execute macro keybinds (Bypasses basic gameProcessed flags safely)
         if input.UserInputType == Enum.UserInputType.Keyboard then
             if input.KeyCode == Keybinds.ToggleMenu then
                 setGuiVisible(not isGuiOpen)
