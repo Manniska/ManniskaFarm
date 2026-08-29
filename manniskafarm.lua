@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V14.6 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V14.7 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -322,7 +322,7 @@ local bootSub = Instance.new("TextLabel")
 bootSub.Size = UDim2.new(1, 0, 0, 16)
 bootSub.Position = UDim2.new(0, 0, 0, 52)
 bootSub.BackgroundTransparency = 1
-bootSub.Text = "V14.6 • INITIALIZING SUBSYSTEMS"
+bootSub.Text = "V14.7 • INITIALIZING SUBSYSTEMS"
 bootSub.TextColor3 = Color3.fromRGB(0, 170, 255)
 bootSub.TextSize = 11
 bootSub.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -742,7 +742,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V14.6"
+    titleLabel.Text = "MANNISKAFARM V14.7"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -2708,7 +2708,7 @@ task.spawn(function()
 end)
 
 -- =====================================================================
--- HYBRID MINING ENGINE (HUMANIZED SWING + EXPLICIT "NO ORE" CHECK)
+-- HYBRID MINING ENGINE (FAST RANDOMIZED SWING + LINGER-PROOF TEXT CHECK)
 -- =====================================================================
 local function executeMiningNode(data, root)
     local targetPosition = data.promptPos or data.pos
@@ -2730,46 +2730,70 @@ local function executeMiningNode(data, root)
             VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Four, false, game)
         end)
     end
-    task.wait(0.8)
+    task.wait(0.6) -- Shortened draw animation wait
 
     local manualTimer = data.actionHoldDuration or 15.0
 
     if Config.SmartMiningEnabled then
-        -- SMART BRANCH: Humanized Swing + Explicit "No ore remaining!" Check
         local timeOut = tick() + Config.MiningFailsafeTimeout
+        
+        -- Track depletion text from the previous rock so fading ghost text doesn't trigger early exit
+        local lastDepletionTime = nil
+        local depletionCooldown = 0.5 -- seconds of stable depletion text before we accept it
+
+        -- Position lock: record where we started mining
+        local miningStartPosition = targetPosition
+        local maxDriftDistance = 8.0 -- max studs we'll drift before forcing a reposition
 
         while isPlaying and tick() < timeOut do
-            -- 1. Humanized Swing (Bypasses the 600s Anti-Cheat Cooldown)
+            -- Position check: if we've drifted too far from the mining target, snap back
+            local _, curRoot, curHum = getCharacter()
+            if curRoot then
+                local drift = (curRoot.Position - miningStartPosition).Magnitude
+                if drift > maxDriftDistance then
+                    showToast("⛏️ Drifted too far, repositioning...")
+                    curRoot.AssemblyLinearVelocity = Vector3.zero
+                    curRoot.CFrame = CFrame.lookAt(curRoot.Position, Vector3.new(targetPosition.X, curRoot.Position.Y, targetPosition.Z))
+                    task.wait(0.2)
+                end
+            end
+
+            -- 1. Fast Humanized Swing (Bypasses the 600s Anti-Cheat Cooldown)
             if VirtualInputManager then
                 pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0) end)
-                task.wait(0.1) -- Hold mouse briefly for a realistic click
+                task.wait(0.05) -- Fast, crisp click down/up
                 pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0) end)
             end
 
-            -- 2. Zero-Lag UI Scanner (Runs only once per swing during the cooldown)
+            -- 2. Scan for "No ore remaining!" with cooldown stabilization
             local isDepleted = false
             for _, desc in ipairs(playerGui:GetDescendants()) do
                 if desc:IsA("TextLabel") and desc.Visible then
                     local text = string.lower(desc.Text)
-                    -- Explicitly hunt for the red completion text
-                    if string.find(text, "no ore remaining") then
+                    if string.find(text, "no ore remaining") or string.find(text, "depleted") then
                         isDepleted = true
                         break
                     end
                 end
             end
 
-            -- 3. Absolute Depletion Logic
             if isDepleted then
-                showToast("⛏️ Rock completely depleted ('No ore remaining!')")
-                break
+                if lastDepletionTime == nil then
+                    lastDepletionTime = tick()
+                elseif (tick() - lastDepletionTime) >= depletionCooldown then
+                    showToast("⛏️ Rock completely depleted!")
+                    break
+                end
+            else
+                lastDepletionTime = nil -- reset cooldown if text disappears
             end
 
-            -- Humanized swing cooldown (0.65s wait ensures we don't swing too fast and tanks 0 FPS)
-            task.wait(0.65)
+            -- Dynamic swing delay (0.30s - 0.45s) prevents static macro flagging while keeping speed fast
+            local randomSwingCooldown = 0.30 + (math.random(0, 15) / 100)
+            task.wait(randomSwingCooldown)
         end
     else
-        -- MANUAL BRANCH: Blind Swing Timer with Humanized rhythm
+        -- MANUAL BRANCH: Blind Swing Timer with Fast Humanized Rhythm
         showToast(string.format("Blind Mining: %.1fs", manualTimer))
         local swingStart = tick()
         while isPlaying and (tick() - swingStart) < manualTimer do
@@ -2779,11 +2803,12 @@ local function executeMiningNode(data, root)
             
             if VirtualInputManager then
                 pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0) end)
-                task.wait(0.1)
+                task.wait(0.05)
                 pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0) end)
             end
             
-            task.wait(0.65)
+            local randomSwingCooldown = 0.30 + (math.random(0, 15) / 100)
+            task.wait(randomSwingCooldown)
         end
     end
 
@@ -3670,4 +3695,4 @@ for _, item in ipairs(mainFrame:GetDescendants()) do
 end
 mainFrame.BackgroundTransparency = 0.15
 
-print("🚀 Autofarm V14.6 (Smart Mine + Auto-Sell) Loaded.")
+print("🚀 Autofarm V14.7 (Smart Mine + Auto-Sell) Loaded.")
