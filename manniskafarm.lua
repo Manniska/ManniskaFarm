@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V12.7 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V12.8 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -148,7 +148,15 @@ local Config = {
     RadarAction = "Pause",
     
     UseExternalBridge = true,
-    BridgeFileName = "macro_bridge.txt"
+    BridgeFileName = "macro_bridge.txt",
+    
+    -- Mining Config
+    SmartMiningEnabled = false,
+    AutoLootGems = true,
+    MiningFailsafeTimeout = 20,
+    AutoSellEnabled = false,
+    SellRouteFile = "SellRoute.json",
+    ReturnRouteFile = "ReturnRoute.json"
 }
 
 if writefile then
@@ -644,7 +652,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V12.7"
+    titleLabel.Text = "MANNISKAFARM V12.8"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -908,6 +916,7 @@ do
     end
 
     local controlsPage = createPage("Controls")
+    local miningPage = createPage("Mining")
     local settingsPage = createPage("Settings")
     local advancedPage = createPage("Advanced")
     local safetyPage = createPage("Safety")
@@ -946,6 +955,7 @@ do
     end
 
     createTabButton("Controls", controlsPage, true)
+    createTabButton("Mining", miningPage, false)
     createTabButton("Settings", settingsPage, false)
     createTabButton("Advanced", advancedPage, false)
     createTabButton("Safety", safetyPage, false)
@@ -1468,6 +1478,27 @@ do
             if showToast then showToast("Edit Mode ON: Walk near a node to edit.") end
         end
     end, 9, false)
+
+    -- --- MINING PAGE ---
+    createSectionHeader(miningPage, "Smart Mining System", 1)
+
+    createToggleRow(miningPage, "SmartMiningToggle", "Enable Smart Mining (Damage Bar)", activeTheme.Accent, function(state)
+        Config.SmartMiningEnabled = state
+    end, 2, Config.SmartMiningEnabled)
+
+    createToggleRow(miningPage, "AutoLootToggle", "Auto-Loot Dropped Gems (E)", Color3.fromRGB(0, 255, 128), function(state)
+        Config.AutoLootGems = state
+    end, 3, Config.AutoLootGems)
+
+    createSliderRow(miningPage, "MiningFailsafeSlider", "Mining Swing Timeout", 5, 60, Config.MiningFailsafeTimeout, "%d Seconds", function(val)
+        Config.MiningFailsafeTimeout = math.floor(val)
+    end, 4)
+
+    createSectionHeader(miningPage, "Auto-Sell & Inventory", 5)
+
+    createToggleRow(miningPage, "AutoSellToggle", "Auto-Sell on Backpack Full", Color3.fromRGB(255, 170, 0), function(state)
+        Config.AutoSellEnabled = state
+    end, 6, Config.AutoSellEnabled)
 
     -- --- SETTINGS PAGE ---
     createSectionHeader(settingsPage, "Playback & Scaling", 1)
@@ -3177,4 +3208,4 @@ _G.Autofarm_Control = {
     Keybinds = Keybinds
 }
 
-print("🚀 Autofarm V12.7 (Hardware Bridge & Interaction Suite) Loaded.")
+print("🚀 Autofarm V12.8 (Hardware Bridge & Interaction Suite) Loaded.")
