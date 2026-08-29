@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V13.6 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V13.7 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -322,7 +322,7 @@ local bootSub = Instance.new("TextLabel")
 bootSub.Size = UDim2.new(1, 0, 0, 16)
 bootSub.Position = UDim2.new(0, 0, 0, 52)
 bootSub.BackgroundTransparency = 1
-bootSub.Text = "V13.6 • INITIALIZING SUBSYSTEMS"
+bootSub.Text = "V13.7 • INITIALIZING SUBSYSTEMS"
 bootSub.TextColor3 = Color3.fromRGB(0, 170, 255)
 bootSub.TextSize = 11
 bootSub.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -387,6 +387,12 @@ local errorModal, statusHUD, hudBadgeLabel, hudNodeLabel, hudLoopLabel, hudBadge
 
 -- Global Control Forward References
 local startRecording, stopRecording, startPlayback, stopPlayback, clearWaypoints, undoLastNode, saveRouteToFile, loadRouteFromFile, copyRouteToClipboard, terminateProcess
+
+-- Kinematic State Forward Declarations (Scope Fix)
+local Waypoints = {}
+local isRecording = false
+local isPlaying = false
+local lastWaypointTime = 0
 
 -- Visualizer Setup & Object Pooling (LAG FIX)
 local visualizerFolder = workspace:FindFirstChild("ManniskaPathVisualizer") or Instance.new("Folder")
@@ -736,7 +742,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V13.6"
+    titleLabel.Text = "MANNISKAFARM V13.7"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -2381,12 +2387,10 @@ renderVisualPath = function(waypointsList)
 end
 
 -- Kinematics & Record Engine State
-local Waypoints = {}
-local isRecording = false
-local isPlaying = false
+-- (Waypoints, isRecording, isPlaying, and lastWaypointTime are now safely hoisted to the top)
 local promptConnection, jumpConnection, keyConnection, keyEndConnection, stateConnection, deathConnection
 local jumpTriggered = false
-local lastWaypointTime, lastPromptClickTime = 0, 0
+local lastPromptClickTime = 0
 local holdStartTick = nil
 
 local function hookDeathFailSafe()
@@ -3719,4 +3723,4 @@ for _, item in ipairs(mainFrame:GetDescendants()) do
 end
 mainFrame.BackgroundTransparency = 0.15
 
-print("🚀 Autofarm V13.6 (Smart Mine + Auto-Sell) Loaded.")
+print("🚀 Autofarm V13.7 (Smart Mine + Auto-Sell) Loaded.")
