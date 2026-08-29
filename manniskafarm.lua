@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V13.8 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V13.9 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -322,7 +322,7 @@ local bootSub = Instance.new("TextLabel")
 bootSub.Size = UDim2.new(1, 0, 0, 16)
 bootSub.Position = UDim2.new(0, 0, 0, 52)
 bootSub.BackgroundTransparency = 1
-bootSub.Text = "V13.8 • INITIALIZING SUBSYSTEMS"
+bootSub.Text = "V13.9 • INITIALIZING SUBSYSTEMS"
 bootSub.TextColor3 = Color3.fromRGB(0, 170, 255)
 bootSub.TextSize = 11
 bootSub.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -742,7 +742,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V13.8"
+    titleLabel.Text = "MANNISKAFARM V13.9"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -1895,7 +1895,7 @@ do
                     
                     if not Waypoints then Waypoints = {} end
                     
-                    -- Node Vacuum: Erase the previous node if it was just you standing still
+                    -- Node Vacuum: Erase the previous node if it was just you standing still aiming
                     if #Waypoints > 0 then
                         local prevNode = Waypoints[#Waypoints]
                         if not prevNode.action and not prevNode.isInteractionNode and not prevNode.jump and not prevNode.isMineNode then
@@ -2747,10 +2747,10 @@ local function executeMiningNode(data, root)
         pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0) end)
     end
     
-    local manualTimer = data.actionHoldDuration or 8.5 -- Default fallback time
+    local manualTimer = data.actionHoldDuration or 12.0 -- Fallback bumped to 12s
 
     if Config.SmartMiningEnabled then
-        -- SMART BRANCH: Dynamic Wait & UI Caching (Zero Lag)
+        -- SMART BRANCH: Throttled Pulse Scanner (Zero Lag)
         local timeOut = tick() + Config.MiningFailsafeTimeout
         local uiGracePeriod = tick() + 5.0 -- 5s to hit the rock and spawn the UI
         local cachedProgressBar = nil
@@ -2765,10 +2765,9 @@ local function executeMiningNode(data, root)
             if not cachedProgressBar then
                 -- Throttle the search to avoid lag
                 for _, desc in ipairs(playerGui:GetDescendants()) do
-                    if desc:IsA("Frame") or desc:IsA("TextLabel") then
-                        local name = string.lower(desc.Name)
-                        local text = desc:IsA("TextLabel") and string.lower(desc.Text) or ""
-                        if (string.find(name, "progress") or string.find(name, "mine") or string.find(text, "mining")) and desc.Visible and desc.AbsoluteSize.X > 0 then
+                    if desc:IsA("TextLabel") and desc.Visible then
+                        local text = string.lower(desc.Text)
+                        if string.find(text, "%%") or string.find(text, "deposit") or string.find(text, "ore") or string.find(text, "rock") then
                             cachedProgressBar = desc
                             break
                         end
@@ -2776,10 +2775,10 @@ local function executeMiningNode(data, root)
                 end
 
                 if not cachedProgressBar and tick() > uiGracePeriod then
-                    showToast("Rock empty or missing UI. Moving on.")
+                    showToast("Ghost Rock (No UI). Moving on.")
                     break
                 end
-                task.wait(0.25) -- Safe throttle to completely eliminate UI lag
+                task.wait(0.25) -- Safe throttle
             else
                 -- UI Locked On: Monitor it dynamically until it breaks
                 if cachedProgressBar.Parent and cachedProgressBar.Visible and cachedProgressBar.AbsoluteSize.X > 0 then
@@ -2787,8 +2786,8 @@ local function executeMiningNode(data, root)
                 else
                     if not lostUITime then
                         lostUITime = tick()
-                    elseif (tick() - lostUITime) >= 1.0 then
-                        -- UI has been gone for 1 full second. Rock is fully broken.
+                    elseif (tick() - lostUITime) >= 1.5 then
+                        -- UI has been gone for 1.5s. Rock is fully broken.
                         showToast("⛏️ Rock mined completely!")
                         break
                     end
@@ -2804,7 +2803,7 @@ local function executeMiningNode(data, root)
             if root and targetPosition then
                 root.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetPosition.X, root.Position.Y, targetPosition.Z))
             end
-            task.wait(0.1)
+            task.wait(0.25)
         end
     end
 
@@ -2815,8 +2814,7 @@ local function executeMiningNode(data, root)
     task.wait(0.2)
 
     -- Phase 3: Auto-Loot Sweeper (15-stud radius)
-    if not isPlaying then return end
-    if Config.AutoLootGems and root then
+    if isPlaying and Config.AutoLootGems and root then
         local rootPos = root.Position
         local bestGem = nil
         local bestDist = 15
@@ -2850,6 +2848,16 @@ local function executeMiningNode(data, root)
             end
         end
     end
+
+    -- Phase 4: Holster Pickaxe
+    if VirtualInputManager and isPlaying then
+        pcall(function()
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Four, false, game)
+            task.wait(0.05)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Four, false, game)
+        end)
+    end
+    task.wait(0.4)
 end
 
 -- Hardware Prompt & ObjectAction Resolver
@@ -3143,87 +3151,9 @@ startPlayback = function()
                     curRoot.CFrame = CFrame.new(data.pos)
                     task.wait(0.02 / Config.SpeedMultiplier)
                 else
-                    if data.isMineNode then
-                        executeMiningNode(data, curRoot)
-                        
-                        -- =========================================
-                        -- BREADCRUMB AUTO-SELL HOOK
-                        -- =========================================
-                        if Config.AutoSellEnabled and checkInventoryFull() then
-                            showToast("🎒 Backpack Full! Backtracking to Anchor...")
-                            
-                            -- 1. Reverse Traverse the Breadcrumbs safely
-                            for rev = i, 1, -1 do
-                                if not isPlaying then break end
-                                local revData = Waypoints[rev]
-                                setHaloTarget(revData.pos)
-                                local s = 16 * Config.SpeedMultiplier
-                                navigateToPoint(revData.pos, s)
-                                
-                                -- Jump if the original path required a jump over this terrain
-                                if revData.jump then
-                                    local _, _, h = getCharacter()
-                                    if h then
-                                        h.Jump = true
-                                        h:ChangeState(Enum.HumanoidStateType.Jumping)
-                                    end
-                                end
-                            end
-
-                            -- 2. Execute Sub-Routes
-                            if isPlaying then
-                                showToast("Executing Sell Route: " .. Config.SellRouteFile)
-                                executeSubRoute(Config.SellRouteFile)
-                            end
-
-                            if isPlaying then
-                                showToast("Executing Return Route: " .. Config.ReturnRouteFile)
-                                executeSubRoute(Config.ReturnRouteFile)
-                            end
-
-                            -- 3. Reset main loop index to seamlessly resume from Anchor
-                            if isPlaying then
-                                i = 1
-                                showToast("Resuming Main Mining Route.")
-                            end
-                        end
-                        -- =========================================
-
-                    elseif data.action or data.actionPromptName or data.isInteractionNode or data.promptPos then
-                        if hum then hum:MoveTo(curRoot.Position) end
-                        resolveAndTriggerPrompt(data, curRoot)
-                    end
-
-                    if data.pauseDuration and data.pauseDuration > 0.3 and not data.action and not data.isInteractionNode then
-                        local pauseStart = tick()
-                        local totalPause = data.pauseDuration / Config.SpeedMultiplier
-
-                        while (tick() - pauseStart) < totalPause and isPlaying do
-                            local _, stillRoot, stillHum = getCharacter()
-                            if stillHum then stillHum:Move(Vector3.zero, false) end
-                            if stillRoot then
-                                stillRoot.AssemblyLinearVelocity = Vector3.zero
-                                stillRoot.CFrame = CFrame.new(data.pos.X, stillRoot.Position.Y, data.pos.Z)
-                            end
-                            task.wait(0.05)
-                        end
-                    end
-
-                    if data.jump then
-                        if Config.MicroRandomization then
-                            task.wait(math.random(15, 55) / 1000)
-                        end
-                        if hum and hum.FloorMaterial ~= Enum.Material.Air then
-                            hum.Jump = true
-                            hum:ChangeState(Enum.HumanoidStateType.Jumping)
-                        else
-                            local jumpPower = (hum and hum.JumpPower > 0) and hum.JumpPower or 50
-                            curRoot.AssemblyLinearVelocity = Vector3.new(curRoot.AssemblyLinearVelocity.X, jumpPower, curRoot.AssemblyLinearVelocity.Z)
-                        end
-                    end
-
+                    -- 1. MOVE TO NODE FIRST
                     local targetPos = data.pos
-                    if Config.MicroRandomization and not data.action and not data.jump and not data.isInteractionNode then
+                    if Config.MicroRandomization and not data.action and not data.jump and not data.isInteractionNode and not data.isMineNode then
                         local driftX = (math.random(-20, 20) / 100)
                         local driftZ = (math.random(-20, 20) / 100)
                         targetPos = targetPos + Vector3.new(driftX, 0, driftZ)
@@ -3232,6 +3162,9 @@ startPlayback = function()
                     local timeout = 0
                     local stuckClock = 0
                     local checkPos = getEntityPosition() or curRoot.Position
+                    
+                    -- Precision Override: 1.0 stud for crucial Action/Mine nodes to ensure proximity
+                    local precision = (data.isMineNode or data.action or data.isInteractionNode) and 1.0 or (2.2 * Config.SpeedMultiplier)
 
                     while isPlaying do
                         local _, dynamicRoot, dynamicHum = getCharacter()
@@ -3241,7 +3174,7 @@ startPlayback = function()
                         local flatDelta = Vector3.new(targetPos.X - curPos.X, 0, targetPos.Z - curPos.Z)
                         local flatDist = flatDelta.Magnitude
 
-                        if flatDist < (2.2 * Config.SpeedMultiplier) then
+                        if flatDist < precision then
                             break
                         end
 
@@ -3282,8 +3215,78 @@ startPlayback = function()
                         if timeout > (3.5 / Config.SpeedMultiplier) then
                             break
                         end
-
                         task.wait(0.03)
+                    end
+                    
+                    -- Stop momentum before actions
+                    if data.isMineNode or data.action or data.isInteractionNode then
+                        local _, stopRoot, stopHum = getCharacter()
+                        if stopHum then stopHum:Move(Vector3.zero, false) end
+                        if stopRoot then stopRoot.AssemblyLinearVelocity = Vector3.zero end
+                    end
+
+                    -- 2. JUMP
+                    if data.jump then
+                        if Config.MicroRandomization then task.wait(math.random(15, 55) / 1000) end
+                        if hum and hum.FloorMaterial ~= Enum.Material.Air then
+                            hum.Jump = true
+                            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+                        else
+                            local jumpPower = (hum and hum.JumpPower > 0) and hum.JumpPower or 50
+                            curRoot.AssemblyLinearVelocity = Vector3.new(curRoot.AssemblyLinearVelocity.X, jumpPower, curRoot.AssemblyLinearVelocity.Z)
+                        end
+                    end
+                    
+                    -- 3. PAUSE
+                    if data.pauseDuration and data.pauseDuration > 0.3 and not data.action and not data.isInteractionNode then
+                        local pauseStart = tick()
+                        local totalPause = data.pauseDuration / Config.SpeedMultiplier
+
+                        while (tick() - pauseStart) < totalPause and isPlaying do
+                            local _, stillRoot, stillHum = getCharacter()
+                            if stillHum then stillHum:Move(Vector3.zero, false) end
+                            if stillRoot then
+                                stillRoot.AssemblyLinearVelocity = Vector3.zero
+                                stillRoot.CFrame = CFrame.new(data.pos.X, stillRoot.Position.Y, data.pos.Z)
+                            end
+                            task.wait(0.05)
+                        end
+                    end
+                    
+                    -- 4. EXECUTE ACTIONS
+                    if data.isMineNode then
+                        executeMiningNode(data, curRoot)
+                        
+                        -- Breadcrumb Auto-Sell Hook
+                        if Config.AutoSellEnabled and checkInventoryFull() then
+                            showToast("🎒 Backpack Full! Backtracking to Anchor...")
+                            for rev = i, 1, -1 do
+                                if not isPlaying then break end
+                                local revData = Waypoints[rev]
+                                setHaloTarget(revData.pos)
+                                local s = 16 * Config.SpeedMultiplier
+                                navigateToPoint(revData.pos, s)
+                                if revData.jump then
+                                    local _, _, h = getCharacter()
+                                    if h then h.Jump = true; h:ChangeState(Enum.HumanoidStateType.Jumping) end
+                                end
+                            end
+
+                            if isPlaying then
+                                showToast("Executing Sell Route: " .. Config.SellRouteFile)
+                                executeSubRoute(Config.SellRouteFile)
+                            end
+
+                            if isPlaying then
+                                showToast("Executing Return Route: " .. Config.ReturnRouteFile)
+                                executeSubRoute(Config.ReturnRouteFile)
+                            end
+
+                            if isPlaying then i = 1; showToast("Resuming Main Mining Route.") end
+                        end
+                    elseif data.action or data.actionPromptName or data.isInteractionNode or data.promptPos then
+                        if hum then hum:MoveTo(curRoot.Position) end
+                        resolveAndTriggerPrompt(data, curRoot)
                     end
                 end
 
@@ -3749,4 +3752,4 @@ for _, item in ipairs(mainFrame:GetDescendants()) do
 end
 mainFrame.BackgroundTransparency = 0.15
 
-print("🚀 Autofarm V13.8 (Smart Mine + Auto-Sell) Loaded.")
+print("🚀 Autofarm V13.9 (Smart Mine + Auto-Sell) Loaded.")
