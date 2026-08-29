@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V13.1 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V13.2 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -114,7 +114,8 @@ local Keybinds = {
     ToggleMenu = Enum.KeyCode.RightShift,
     ToggleRecord = Enum.KeyCode.R,
     TogglePlay = Enum.KeyCode.P,
-    UndoNode = Enum.KeyCode.Z
+    UndoNode = Enum.KeyCode.Z,
+    AddMineNode = Enum.KeyCode.M
 }
 
 local TWEEN_QUICK = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
@@ -309,7 +310,7 @@ local bootSub = Instance.new("TextLabel")
 bootSub.Size = UDim2.new(1, 0, 0, 20)
 bootSub.Position = UDim2.new(0, 0, 0.4, 0)
 bootSub.BackgroundTransparency = 1
-bootSub.Text = "V13.1 • INITIALIZING SUBSYSTEMS"
+bootSub.Text = "V13.2 • INITIALIZING SUBSYSTEMS"
 bootSub.TextColor3 = Color3.fromRGB(0, 170, 255)
 bootSub.TextSize = 12
 bootSub.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -723,7 +724,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V13.1"
+    titleLabel.Text = "MANNISKAFARM V13.2"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -1796,6 +1797,7 @@ do
     local bindRec = createKeybindRow("Record Route", "ToggleRecord", 15)
     local bindPlay = createKeybindRow("Play Route", "TogglePlay", 16)
     local bindUndo = createKeybindRow("Undo Node", "UndoNode", 17)
+    local bindMine = createKeybindRow("Drop Mine Node", "AddMineNode", 18)
 
     local inputConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if activeBindingKey and input.UserInputType == Enum.UserInputType.Keyboard then
@@ -1804,6 +1806,7 @@ do
             if activeBindingKey == "ToggleRecord" then bindRec.Button.Text = input.KeyCode.Name; bindRec.Button.TextColor3 = activeTheme.TextPrimary end
             if activeBindingKey == "TogglePlay" then bindPlay.Button.Text = input.KeyCode.Name; bindPlay.Button.TextColor3 = activeTheme.TextPrimary end
             if activeBindingKey == "UndoNode" then bindUndo.Button.Text = input.KeyCode.Name; bindUndo.Button.TextColor3 = activeTheme.TextPrimary end
+            if activeBindingKey == "AddMineNode" then bindMine.Button.Text = input.KeyCode.Name; bindMine.Button.TextColor3 = activeTheme.TextPrimary end
             showToast(string.format("%s set to: %s", activeBindingKey, input.KeyCode.Name))
             activeBindingKey = nil
             return
@@ -1822,6 +1825,28 @@ do
                 end
             elseif input.KeyCode == Keybinds.UndoNode then
                 undoLastNode()
+            elseif input.KeyCode == Keybinds.AddMineNode then
+                local pos = getEntityPosition()
+                if pos then
+                    local _, _, h = getCharacter()
+                    table.insert(Waypoints, {
+                        pos = pos,
+                        isMineNode = true,
+                        jump = false,
+                        pauseDuration = 0,
+                        speed = h and h.WalkSpeed or 16,
+                        isSprinting = h and (h.WalkSpeed > 17) or false,
+                        actionHoldDuration = 8.5,
+                        exhaustionCount = 1,
+                        delay = 0.1
+                    })
+                    if renderVisualPath then renderVisualPath(Waypoints) end
+                    if updateTelemetry then updateTelemetry(nil, #Waypoints) end
+                    showToast(string.format("⛏️ Mine node dropped (#%d)", #Waypoints))
+                    playSoundFeedback(1.2)
+                else
+                    showToast("Cannot drop mine node: no position.")
+                end
             end
         end
     end)
@@ -3606,4 +3631,4 @@ for _, item in ipairs(mainFrame:GetDescendants()) do
 end
 mainFrame.BackgroundTransparency = 0.15
 
-print("🚀 Autofarm V13.1 (Smart Mine + Auto-Sell) Loaded.")
+print("🚀 Autofarm V13.2 (Smart Mine + Auto-Sell) Loaded.")
