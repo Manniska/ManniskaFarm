@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V14.1 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V14.3 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -322,7 +322,7 @@ local bootSub = Instance.new("TextLabel")
 bootSub.Size = UDim2.new(1, 0, 0, 16)
 bootSub.Position = UDim2.new(0, 0, 0, 52)
 bootSub.BackgroundTransparency = 1
-bootSub.Text = "V14.1 • INITIALIZING SUBSYSTEMS"
+bootSub.Text = "V14.3 • INITIALIZING SUBSYSTEMS"
 bootSub.TextColor3 = Color3.fromRGB(0, 170, 255)
 bootSub.TextSize = 11
 bootSub.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -742,7 +742,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V14.1"
+    titleLabel.Text = "MANNISKAFARM V14.3"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -1895,20 +1895,6 @@ do
                     
                     if not Waypoints then Waypoints = {} end
                     
-                    -- Super Node Vacuum: Erase all previous pause nodes created while standing and aiming
-                    while #Waypoints > 0 do
-                        local prevNode = Waypoints[#Waypoints]
-                        if not prevNode.action and not prevNode.isInteractionNode and not prevNode.jump and not prevNode.isMineNode then
-                            if (prevNode.pauseDuration and prevNode.pauseDuration > 0) or (prevNode.pos - pos).Magnitude < 4.0 then
-                                table.remove(Waypoints, #Waypoints)
-                            else
-                                break
-                            end
-                        else
-                            break
-                        end
-                    end
-                    
                     table.insert(Waypoints, {
                         pos = pos,
                         promptPos = aimPos,
@@ -2744,29 +2730,28 @@ local function executeMiningNode(data, root)
             VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Four, false, game)
         end)
     end
-    task.wait(0.6) -- Wait for the draw animation to finish
+    task.wait(0.8)
 
-    -- Phase 1: Start Swinging (VIM handles Mouse1 best for mining)
+    -- Phase 1: Start Swinging
     if VirtualInputManager then
         pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0) end)
     end
     
-    local manualTimer = data.actionHoldDuration or 12.0
+    local manualTimer = data.actionHoldDuration or 15.0
 
     if Config.SmartMiningEnabled then
-        -- SMART BRANCH: Robust Multi-Chunk Scanner (Zero Lag)
+        -- SMART BRANCH: Multi-Chunk UI Scanner with Extended Transition Tolerance
         local timeOut = tick() + Config.MiningFailsafeTimeout
-        local uiGracePeriod = tick() + 2.5 -- Stage 1: 2.5s initial grace to draw tool and land first hit
+        local uiGracePeriod = tick() + 3.5
         local sawUI = false
         local noUITime = tick()
 
         while isPlaying and tick() < timeOut do
             local foundBar = false
-            -- Throttle the search to completely eliminate FPS lag
             for _, desc in ipairs(playerGui:GetDescendants()) do
                 if desc:IsA("TextLabel") and desc.Visible then
                     local text = string.lower(desc.Text)
-                    if string.find(text, "%%") or string.find(text, "deposit") or string.find(text, "ore") or string.find(text, "rock") then
+                    if string.find(text, "%%") or string.find(text, "deposit") or string.find(text, "ore") or string.find(text, "coal") or string.find(text, "iron") or string.find(text, "gold") then
                         foundBar = true
                         break
                     end
@@ -2778,8 +2763,8 @@ local function executeMiningNode(data, root)
                 noUITime = tick()
             else
                 if sawUI then
-                    -- Stage 2: Rock chunk vanished. Wait 4.5s to bridge the multi-chunk model transition gap before leaving.
-                    if (tick() - noUITime) >= 4.5 then 
+                    -- 5.5s tolerance to handle multi-chunk ore model transitions
+                    if (tick() - noUITime) >= 5.5 then 
                         showToast("⛏️ Rock mined completely!")
                         break 
                     end
@@ -2788,7 +2773,7 @@ local function executeMiningNode(data, root)
                     break 
                 end
             end
-            task.wait(0.25) -- Safe throttle
+            task.wait(0.2)
         end
     else
         -- MANUAL BRANCH: Blind Swing Timer
@@ -2798,7 +2783,7 @@ local function executeMiningNode(data, root)
             if root and targetPosition then
                 root.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetPosition.X, root.Position.Y, targetPosition.Z))
             end
-            task.wait(0.25)
+            task.wait(0.2)
         end
     end
 
@@ -2806,7 +2791,7 @@ local function executeMiningNode(data, root)
     if VirtualInputManager then
         pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0) end)
     end
-    task.wait(0.2)
+    task.wait(0.3)
 
     -- Phase 3: Auto-Loot Sweeper (15-stud radius)
     if isPlaying and Config.AutoLootGems and root then
@@ -2959,48 +2944,45 @@ local function navigateToPoint(targetPosition, maxSpeed)
     local totalDelta = Vector3.new(targetPosition.X - currentPos.X, 0, targetPosition.Z - currentPos.Z)
     local totalDistance = totalDelta.Magnitude
 
-    if totalDistance <= (2.4 * Config.SpeedMultiplier) then
+    local threshold = 2.0 * Config.SpeedMultiplier
+    if totalDistance <= threshold then
         return true
     end
 
-    local stepCount = math.max(math.ceil(totalDistance / 2.0), 1)
-    local stepVector = (targetPosition - currentPos) / stepCount
+    local timeout = 0
+    local maxTimeout = math.clamp(totalDistance / 6, 1.2, 5.0) / Config.SpeedMultiplier
 
-    for stepIdx = 1, stepCount do
-        if not isPlaying then return false end
+    while isPlaying do
+        local _, curR, curH = getCharacter()
+        if not curR then return false end
 
-        local subTarget = currentPos + (stepVector * stepIdx)
-        local subTimeout = 0
+        local cPos = curR.Position
+        local flatDelta = Vector3.new(targetPosition.X - cPos.X, 0, targetPosition.Z - cPos.Z)
+        local flatDist = flatDelta.Magnitude
 
-        while isPlaying do
-            local _, curR, curH = getCharacter()
-            if not curR then return false end
-
-            local cPos = curR.Position
-            local flatDelta = Vector3.new(subTarget.X - cPos.X, 0, subTarget.Z - cPos.Z)
-            local flatDist = flatDelta.Magnitude
-
-            if flatDist <= (2.2 * Config.SpeedMultiplier) then
-                break
-            end
-
-            local moveDir = flatDelta.Unit
-            local s = (curH and curH.WalkSpeed > 0 and curH.WalkSpeed) or (maxSpeed or 16)
-
-            if curH then
-                curH:MoveTo(subTarget)
-            else
-                curR.AssemblyLinearVelocity = Vector3.new(moveDir.X * s, curR.AssemblyLinearVelocity.Y, moveDir.Z * s)
-                curR.CFrame = CFrame.lookAt(curR.Position, Vector3.new(subTarget.X, curR.Position.Y, subTarget.Z))
-            end
-
-            subTimeout = subTimeout + 0.03
-            if subTimeout > (2.5 / Config.SpeedMultiplier) then
-                break
-            end
-
-            task.wait(0.03)
+        if flatDist <= threshold then
+            break
         end
+
+        local moveDir = flatDelta.Unit
+        local s = (curH and curH.WalkSpeed > 0 and curH.WalkSpeed) or (maxSpeed or 16)
+
+        if curH then
+            curH:MoveTo(targetPosition)
+            if curH.FloorMaterial == Enum.Material.Air and flatDist > 1.0 then
+                curR.AssemblyLinearVelocity = Vector3.new(moveDir.X * s, curR.AssemblyLinearVelocity.Y, moveDir.Z * s)
+            end
+        else
+            curR.AssemblyLinearVelocity = Vector3.new(moveDir.X * s, curR.AssemblyLinearVelocity.Y, moveDir.Z * s)
+            curR.CFrame = CFrame.lookAt(curR.Position, Vector3.new(targetPosition.X, curR.Position.Y, targetPosition.Z))
+        end
+
+        timeout = timeout + 0.03
+        if timeout > maxTimeout then
+            break
+        end
+
+        task.wait(0.03)
     end
 
     return true
@@ -3195,7 +3177,7 @@ startPlayback = function()
                         end
                     end
                     
-                    -- 4. EXECUTE ACTIONS
+                    -- 4. EXECUTE ACTIONS ISOLATED FROM MAIN LOOP
                     if data.isMineNode then
                         executeMiningNode(data, curRoot)
                         
@@ -3694,4 +3676,4 @@ for _, item in ipairs(mainFrame:GetDescendants()) do
 end
 mainFrame.BackgroundTransparency = 0.15
 
-print("🚀 Autofarm V14.1 (Smart Mine + Auto-Sell) Loaded.")
+print("🚀 Autofarm V14.3 (Smart Mine + Auto-Sell) Loaded.")
