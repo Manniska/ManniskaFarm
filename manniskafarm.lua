@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V13.3 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V13.4 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -310,7 +310,7 @@ local bootSub = Instance.new("TextLabel")
 bootSub.Size = UDim2.new(1, 0, 0, 20)
 bootSub.Position = UDim2.new(0, 0, 0.4, 0)
 bootSub.BackgroundTransparency = 1
-bootSub.Text = "V13.3 • INITIALIZING SUBSYSTEMS"
+bootSub.Text = "V13.4 • INITIALIZING SUBSYSTEMS"
 bootSub.TextColor3 = Color3.fromRGB(0, 170, 255)
 bootSub.TextSize = 12
 bootSub.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -724,7 +724,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V13.3"
+    titleLabel.Text = "MANNISKAFARM V13.4"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -1825,12 +1825,18 @@ do
                 end
             elseif input.KeyCode == Keybinds.UndoNode then
                 undoLastNode()
-            elseif input.KeyCode == Keybinds.AddMineNode then
+            elseif input.KeyCode == Keybinds.AddMineNode and isRecording then
                 local pos = getEntityPosition()
                 if pos then
                     local _, _, h = getCharacter()
+                    local cam = workspace.CurrentCamera
+                    local aimPos = pos + (cam and (cam.CFrame.LookVector * 5) or Vector3.zero)
+                    
+                    if not Waypoints then Waypoints = {} end
+                    
                     table.insert(Waypoints, {
                         pos = pos,
+                        promptPos = aimPos,
                         isMineNode = true,
                         jump = false,
                         pauseDuration = 0,
@@ -1838,10 +1844,13 @@ do
                         isSprinting = h and (h.WalkSpeed > 17) or false,
                         actionHoldDuration = 8.5,
                         exhaustionCount = 1,
-                        delay = 0.1
+                        delay = tick() - lastWaypointTime
                     })
+                    lastWaypointTime = tick()
+                    
                     if renderVisualPath then renderVisualPath(Waypoints) end
                     if updateTelemetry then updateTelemetry(nil, #Waypoints) end
+                    
                     showToast(string.format("⛏️ Mine node dropped (#%d)", #Waypoints))
                     playSoundFeedback(1.2)
                 else
@@ -3640,4 +3649,4 @@ for _, item in ipairs(mainFrame:GetDescendants()) do
 end
 mainFrame.BackgroundTransparency = 0.15
 
-print("🚀 Autofarm V13.3 (Smart Mine + Auto-Sell) Loaded.")
+print("🚀 Autofarm V13.4 (Smart Mine + Auto-Sell) Loaded.")
