@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V13.4 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V13.5 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -115,7 +115,7 @@ local Keybinds = {
     ToggleRecord = Enum.KeyCode.R,
     TogglePlay = Enum.KeyCode.P,
     UndoNode = Enum.KeyCode.Z,
-    AddMineNode = Enum.KeyCode.M
+    AddMineNode = Enum.KeyCode.N
 }
 
 local TWEEN_QUICK = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
@@ -290,35 +290,46 @@ screenGui.Parent = playerGui
 -- =====================================================================
 local loadingFrame = Instance.new("Frame")
 loadingFrame.Name = "BootScreen"
-loadingFrame.Size = UDim2.new(1, 0, 1, 0)
-loadingFrame.BackgroundColor3 = Color3.fromRGB(12, 14, 18)
+loadingFrame.Size = UDim2.new(0, 360, 0, 160)
+loadingFrame.Position = UDim2.new(0.5, -180, 0.5, -80)
+loadingFrame.BackgroundColor3 = Color3.fromRGB(16, 18, 24)
 loadingFrame.BorderSizePixel = 0
 loadingFrame.ZIndex = 100
 loadingFrame.Parent = screenGui
 
+local loadCorner = Instance.new("UICorner")
+loadCorner.CornerRadius = UDim.new(0, 12)
+loadCorner.Parent = loadingFrame
+
+local loadStroke = Instance.new("UIStroke")
+loadStroke.Thickness = 1.5
+loadStroke.Color = Color3.fromRGB(0, 170, 255)
+loadStroke.Transparency = 0.3
+loadStroke.Parent = loadingFrame
+
 local bootLogo = Instance.new("TextLabel")
-bootLogo.Size = UDim2.new(1, 0, 0, 40)
-bootLogo.Position = UDim2.new(0, 0, 0.4, -40)
+bootLogo.Size = UDim2.new(1, 0, 0, 30)
+bootLogo.Position = UDim2.new(0, 0, 0, 20)
 bootLogo.BackgroundTransparency = 1
 bootLogo.Text = "MANNISKA KINEMATICS"
 bootLogo.TextColor3 = Color3.fromRGB(240, 245, 255)
-bootLogo.TextSize = 24
+bootLogo.TextSize = 22
 bootLogo.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Heavy)
 bootLogo.Parent = loadingFrame
 
 local bootSub = Instance.new("TextLabel")
-bootSub.Size = UDim2.new(1, 0, 0, 20)
-bootSub.Position = UDim2.new(0, 0, 0.4, 0)
+bootSub.Size = UDim2.new(1, 0, 0, 16)
+bootSub.Position = UDim2.new(0, 0, 0, 52)
 bootSub.BackgroundTransparency = 1
-bootSub.Text = "V13.4 • INITIALIZING SUBSYSTEMS"
+bootSub.Text = "V13.5 • INITIALIZING SUBSYSTEMS"
 bootSub.TextColor3 = Color3.fromRGB(0, 170, 255)
-bootSub.TextSize = 12
+bootSub.TextSize = 11
 bootSub.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
 bootSub.Parent = loadingFrame
 
 local loadBarBg = Instance.new("Frame")
-loadBarBg.Size = UDim2.new(0, 300, 0, 4)
-loadBarBg.Position = UDim2.new(0.5, -150, 0.4, 40)
+loadBarBg.Size = UDim2.new(0, 300, 0, 6)
+loadBarBg.Position = UDim2.new(0.5, -150, 0, 90)
 loadBarBg.BackgroundColor3 = Color3.fromRGB(30, 35, 45)
 loadBarBg.BorderSizePixel = 0
 loadBarBg.Parent = loadingFrame
@@ -335,7 +346,7 @@ local loadFillCorner = Instance.new("UICorner"); loadFillCorner.CornerRadius = U
 
 local bootLog = Instance.new("TextLabel")
 bootLog.Size = UDim2.new(1, 0, 0, 20)
-bootLog.Position = UDim2.new(0, 0, 0.4, 55)
+bootLog.Position = UDim2.new(0, 0, 0, 110)
 bootLog.BackgroundTransparency = 1
 bootLog.Text = "Mounting Virtual Input Manager..."
 bootLog.TextColor3 = Color3.fromRGB(140, 150, 170)
@@ -724,7 +735,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V13.4"
+    titleLabel.Text = "MANNISKAFARM V13.5"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -1812,7 +1823,8 @@ do
             return
         end
 
-        if not gameProcessed and input.UserInputType == Enum.UserInputType.Keyboard then
+        -- Execute macro keybinds even if gameProcessed is true (bypasses map/chat conflicts)
+        if input.UserInputType == Enum.UserInputType.Keyboard then
             if input.KeyCode == Keybinds.ToggleMenu then
                 setGuiVisible(not isGuiOpen)
             elseif input.KeyCode == Keybinds.ToggleRecord then
@@ -2660,6 +2672,16 @@ local function executeMiningNode(data, root)
         root.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetPosition.X, root.Position.Y, targetPosition.Z))
     end
     if camera then camera.CFrame = CFrame.lookAt(camera.CFrame.Position, targetPosition) end
+
+    -- Phase 0: Auto-Equip Tool in Slot 4
+    if VirtualInputManager then
+        pcall(function()
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Four, false, game)
+            task.wait(0.05)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Four, false, game)
+        end)
+    end
+    task.wait(0.6) -- Wait for the equip animation to finish
 
     -- Phase 1: Start Swinging (VIM handles Mouse1 best for mining)
     if VirtualInputManager then
@@ -3649,4 +3671,4 @@ for _, item in ipairs(mainFrame:GetDescendants()) do
 end
 mainFrame.BackgroundTransparency = 0.15
 
-print("🚀 Autofarm V13.4 (Smart Mine + Auto-Sell) Loaded.")
+print("🚀 Autofarm V13.5 (Smart Mine + Auto-Sell) Loaded.")
