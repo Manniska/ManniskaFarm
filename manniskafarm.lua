@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V14.0 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V14.1 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -322,7 +322,7 @@ local bootSub = Instance.new("TextLabel")
 bootSub.Size = UDim2.new(1, 0, 0, 16)
 bootSub.Position = UDim2.new(0, 0, 0, 52)
 bootSub.BackgroundTransparency = 1
-bootSub.Text = "V14.0 • INITIALIZING SUBSYSTEMS"
+bootSub.Text = "V14.1 • INITIALIZING SUBSYSTEMS"
 bootSub.TextColor3 = Color3.fromRGB(0, 170, 255)
 bootSub.TextSize = 11
 bootSub.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -742,7 +742,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V14.0"
+    titleLabel.Text = "MANNISKAFARM V14.1"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -2754,9 +2754,9 @@ local function executeMiningNode(data, root)
     local manualTimer = data.actionHoldDuration or 12.0
 
     if Config.SmartMiningEnabled then
-        -- SMART BRANCH: Two-Stage Multi-Chunk Scanner (Zero Lag)
+        -- SMART BRANCH: Robust Multi-Chunk Scanner (Zero Lag)
         local timeOut = tick() + Config.MiningFailsafeTimeout
-        local uiGracePeriod = tick() + 1.5 -- Stage 1: 1.5s to hit rock. If empty, skips instantly.
+        local uiGracePeriod = tick() + 2.5 -- Stage 1: 2.5s initial grace to draw tool and land first hit
         local sawUI = false
         local noUITime = tick()
 
@@ -2778,8 +2778,8 @@ local function executeMiningNode(data, root)
                 noUITime = tick()
             else
                 if sawUI then
-                    -- Stage 2: Rock vanished: 3.5s tolerance to handle multi-chunk ore respawning
-                    if (tick() - noUITime) >= 3.5 then 
+                    -- Stage 2: Rock chunk vanished. Wait 4.5s to bridge the multi-chunk model transition gap before leaving.
+                    if (tick() - noUITime) >= 4.5 then 
                         showToast("⛏️ Rock mined completely!")
                         break 
                     end
@@ -3146,7 +3146,7 @@ startPlayback = function()
                     curRoot.CFrame = CFrame.new(data.pos)
                     task.wait(0.02 / Config.SpeedMultiplier)
                 else
-                    -- 1. MOVE TO NODE FIRST
+                    -- 1. MOVE TO NODE USING STANDARD UNIFIED VECTOR NAVIGATOR
                     local targetPos = data.pos
                     if Config.MicroRandomization and not data.action and not data.jump and not data.isInteractionNode and not data.isMineNode then
                         local driftX = (math.random(-20, 20) / 100)
@@ -3154,67 +3154,13 @@ startPlayback = function()
                         targetPos = targetPos + Vector3.new(driftX, 0, driftZ)
                     end
 
-                    local timeout = 0
-                    local stuckClock = 0
-                    local checkPos = getEntityPosition() or curRoot.Position
-                    
-                    -- Precision Override: 1.0 stud for crucial Action/Mine nodes to ensure proximity
-                    local precision = (data.isMineNode or data.action or data.isInteractionNode) and 1.0 or (2.2 * Config.SpeedMultiplier)
+                    local activeSpeed = (data.speed and data.speed > 0) and data.speed or 16
+                    activeSpeed = activeSpeed * Config.SpeedMultiplier * speedDrift
 
-                    while isPlaying do
-                        local _, dynamicRoot, dynamicHum = getCharacter()
-                        if not dynamicRoot then break end
+                    -- Use the exact same fluid vector pathing method used everywhere else
+                    navigateToPoint(targetPos, activeSpeed)
 
-                        local curPos = dynamicRoot.Position
-                        local flatDelta = Vector3.new(targetPos.X - curPos.X, 0, targetPos.Z - curPos.Z)
-                        local flatDist = flatDelta.Magnitude
-
-                        if flatDist < precision then
-                            break
-                        end
-
-                        local moveDir = flatDelta.Unit
-                        local s = (dynamicHum and dynamicHum.WalkSpeed > 0 and dynamicHum.WalkSpeed) or (activeSpeed * Config.SpeedMultiplier * speedDrift)
-
-                        if dynamicHum then
-                            dynamicHum:MoveTo(targetPos)
-                            if dynamicHum.FloorMaterial == Enum.Material.Air and flatDist > 0.5 then
-                                dynamicRoot.AssemblyLinearVelocity = Vector3.new(moveDir.X * s, dynamicRoot.AssemblyLinearVelocity.Y, moveDir.Z * s)
-                            end
-                        else
-                            dynamicRoot.AssemblyLinearVelocity = Vector3.new(moveDir.X * s, dynamicRoot.AssemblyLinearVelocity.Y, moveDir.Z * s)
-                            dynamicRoot.CFrame = CFrame.lookAt(dynamicRoot.Position, Vector3.new(targetPos.X, dynamicRoot.Position.Y, targetPos.Z))
-                        end
-
-                        if Config.FallDamper and dynamicRoot.AssemblyLinearVelocity.Y < -45 then
-                            dynamicRoot.AssemblyLinearVelocity = Vector3.new(dynamicRoot.AssemblyLinearVelocity.X, -10, dynamicRoot.AssemblyLinearVelocity.Z)
-                        end
-
-                        -- Only override with jumping if strictly enabled by user
-                        if Config.AutoUnstuckEnabled then
-                            stuckClock = stuckClock + 0.03
-                            if stuckClock >= 0.5 then
-                                local moved = (curPos - checkPos).Magnitude
-                                if moved < 0.35 then
-                                    if dynamicHum then
-                                        dynamicHum.Jump = true
-                                        dynamicHum:ChangeState(Enum.HumanoidStateType.Jumping)
-                                    end
-                                    dynamicRoot.AssemblyLinearVelocity = Vector3.new(moveDir.X * (s + 6), 35, moveDir.Z * (s + 6))
-                                end
-                                checkPos = curPos
-                                stuckClock = 0
-                            end
-                        end
-
-                        timeout = timeout + 0.03
-                        if timeout > (3.5 / Config.SpeedMultiplier) then
-                            break
-                        end
-                        task.wait(0.03)
-                    end
-                    
-                    -- Stop momentum before actions
+                    -- Stop momentum smoothly before actions
                     if data.isMineNode or data.action or data.isInteractionNode then
                         local _, stopRoot, stopHum = getCharacter()
                         if stopHum then stopHum:Move(Vector3.zero, false) end
@@ -3748,4 +3694,4 @@ for _, item in ipairs(mainFrame:GetDescendants()) do
 end
 mainFrame.BackgroundTransparency = 0.15
 
-print("🚀 Autofarm V14.0 (Smart Mine + Auto-Sell) Loaded.")
+print("🚀 Autofarm V14.1 (Smart Mine + Auto-Sell) Loaded.")
