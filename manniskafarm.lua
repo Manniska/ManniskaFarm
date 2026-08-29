@@ -281,6 +281,7 @@ local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ManniskaFarmUI"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.IgnoreGuiInset = true
 screenGui.Parent = playerGui
 
 -- =====================================================================
@@ -3550,10 +3551,29 @@ _G.Autofarm_Control = {
 updateLoadPhase(1.0, "Boot Sequence Complete.")
 mainFrame.Visible = false
 mainFrame.BackgroundTransparency = 1
-for _, child in ipairs(mainFrame:GetChildren()) do
-    if child:IsA("Frame") or child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("ScrollingFrame") then
-        child.BackgroundTransparency = 1
-        if child:IsA("TextLabel") or child:IsA("TextButton") then child.TextTransparency = 1 end
+
+-- Capture every element's original transparency so the UI is restored exactly
+-- (fixes broken background transparency after the loading screen fades out)
+local function hasBackground(obj)
+    return obj:IsA("Frame") or obj:IsA("TextButton") or obj:IsA("TextBox") or obj:IsA("TextLabel") or obj:IsA("ScrollingFrame")
+end
+local function hasText(obj)
+    return obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox")
+end
+
+local originalTransparency = {}
+for _, item in ipairs(mainFrame:GetDescendants()) do
+    if item:IsA("GuiObject") then
+        local entry = {}
+        if hasBackground(item) then
+            entry.Background = item.BackgroundTransparency
+            item.BackgroundTransparency = 1
+        end
+        if hasText(item) then
+            entry.Text = item.TextTransparency
+            item.TextTransparency = 1
+        end
+        originalTransparency[item] = entry
     end
 end
 
@@ -3569,17 +3589,21 @@ end
 task.wait(0.6)
 loadingFrame:Destroy()
 
--- Smooth fade in for Main UI
+-- Smooth fade in for Main UI (restore exact original transparency values)
 mainFrame.Visible = true
+mainFrame.BackgroundTransparency = 0
 TweenService:Create(mainFrame, TweenInfo.new(0.4), { BackgroundTransparency = 0.15 }):Play()
-for _, child in ipairs(mainFrame:GetChildren()) do
-    if child:IsA("Frame") or child:IsA("ScrollingFrame") then
-        local t = child.Name == "Header" and 0.2 or 0
-        if child.Name == "Tabs" then t = 0.6 end
-        TweenService:Create(child, TweenInfo.new(0.4), { BackgroundTransparency = t }):Play()
-    elseif child:IsA("TextLabel") or child:IsA("TextButton") then
-        TweenService:Create(child, TweenInfo.new(0.4), { TextTransparency = 0 }):Play()
+for _, item in ipairs(mainFrame:GetDescendants()) do
+    local orig = originalTransparency[item]
+    if orig then
+        if orig.Background ~= nil and hasBackground(item) then
+            TweenService:Create(item, TweenInfo.new(0.4), { BackgroundTransparency = orig.Background }):Play()
+        end
+        if orig.Text ~= nil and hasText(item) then
+            TweenService:Create(item, TweenInfo.new(0.4), { TextTransparency = orig.Text }):Play()
+        end
     end
 end
+mainFrame.BackgroundTransparency = 0.15
 
 print("🚀 Autofarm V13.1 (Smart Mine + Auto-Sell) Loaded.")
