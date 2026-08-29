@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V14.3 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V14.4 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -322,7 +322,7 @@ local bootSub = Instance.new("TextLabel")
 bootSub.Size = UDim2.new(1, 0, 0, 16)
 bootSub.Position = UDim2.new(0, 0, 0, 52)
 bootSub.BackgroundTransparency = 1
-bootSub.Text = "V14.3 • INITIALIZING SUBSYSTEMS"
+bootSub.Text = "V14.4 • INITIALIZING SUBSYSTEMS"
 bootSub.TextColor3 = Color3.fromRGB(0, 170, 255)
 bootSub.TextSize = 11
 bootSub.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -742,7 +742,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V14.3"
+    titleLabel.Text = "MANNISKAFARM V14.4"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -2708,7 +2708,7 @@ task.spawn(function()
 end)
 
 -- =====================================================================
--- HYBRID MINING ENGINE (SMART UI + MANUAL FALLBACK)
+-- HYBRID MINING ENGINE (WORKSPACE MODEL + EXPLICIT "NO ORE" CHECK)
 -- =====================================================================
 local function executeMiningNode(data, root)
     local targetPosition = data.promptPos or data.pos
@@ -2740,40 +2740,65 @@ local function executeMiningNode(data, root)
     local manualTimer = data.actionHoldDuration or 15.0
 
     if Config.SmartMiningEnabled then
-        -- SMART BRANCH: Multi-Chunk UI Scanner with Extended Transition Tolerance
+        -- SMART BRANCH: Workspace Model Proximity + Explicit "No ore remaining!" Check
         local timeOut = tick() + Config.MiningFailsafeTimeout
-        local uiGracePeriod = tick() + 3.5
-        local sawUI = false
-        local noUITime = tick()
+        local uiGracePeriod = tick() + 3.0
+        local sawActiveMining = false
 
         while isPlaying and tick() < timeOut do
-            local foundBar = false
-            for _, desc in ipairs(playerGui:GetDescendants()) do
-                if desc:IsA("TextLabel") and desc.Visible then
-                    local text = string.lower(desc.Text)
-                    if string.find(text, "%%") or string.find(text, "deposit") or string.find(text, "ore") or string.find(text, "coal") or string.find(text, "iron") or string.find(text, "gold") then
-                        foundBar = true
+            -- 1. Check if the OreDeposit model / target parts are still physically near the node position
+            local oreFoundNear = false
+            for _, obj in ipairs(workspace:GetChildren()) do
+                if obj:IsA("Model") and (string.lower(obj.Name) == "oredeposit" or string.find(string.lower(obj.Name), "ore") or string.find(string.lower(obj.Name), "rock")) then
+                    local primary = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+                    if primary and (primary.Position - targetPosition).Magnitude < 7.0 then
+                        oreFoundNear = true
                         break
                     end
                 end
             end
 
-            if foundBar then
-                sawUI = true
-                noUITime = tick()
-            else
-                if sawUI then
-                    -- 5.5s tolerance to handle multi-chunk ore model transitions
-                    if (tick() - noUITime) >= 5.5 then 
-                        showToast("⛏️ Rock mined completely!")
-                        break 
+            -- 2. Check PlayerGui for the explicit completion text "No ore remaining!"
+            local explicitDepleted = false
+            for _, desc in ipairs(playerGui:GetDescendants()) do
+                if desc:IsA("TextLabel") and desc.Visible then
+                    local text = string.lower(desc.Text)
+                    if string.find(text, "no ore remaining") or string.find(text, "depleted") then
+                        explicitDepleted = true
+                        break
                     end
-                elseif tick() > uiGracePeriod then
-                    showToast("Rock Empty. Skipping...")
-                    break 
                 end
             end
-            task.wait(0.2)
+
+            -- Check if interaction tooltip or health bar is visible
+            local barVisible = false
+            for _, desc in ipairs(playerGui:GetDescendants()) do
+                if desc:IsA("TextLabel") and desc.Visible then
+                    local text = string.lower(desc.Text)
+                    if string.find(text, "%%") or string.find(text, "deposit") then
+                        barVisible = true
+                        break
+                    end
+                end
+            end
+
+            if barVisible or oreFoundNear then
+                sawActiveMining = true
+            end
+
+            -- Exit conditions
+            if explicitDepleted then
+                showToast("⛏️ Rock depleted ('No ore remaining!')")
+                break
+            elseif sawActiveMining and not oreFoundNear and not barVisible then
+                showToast("⛏️ Ore deposit model cleared/removed!")
+                break
+            elseif not sawActiveMining and tick() > uiGracePeriod then
+                showToast("Rock Empty on arrival. Skipping...")
+                break
+            end
+
+            task.wait(0.25)
         end
     else
         -- MANUAL BRANCH: Blind Swing Timer
@@ -2783,7 +2808,7 @@ local function executeMiningNode(data, root)
             if root and targetPosition then
                 root.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetPosition.X, root.Position.Y, targetPosition.Z))
             end
-            task.wait(0.2)
+            task.wait(0.25)
         end
     end
 
@@ -3676,4 +3701,4 @@ for _, item in ipairs(mainFrame:GetDescendants()) do
 end
 mainFrame.BackgroundTransparency = 0.15
 
-print("🚀 Autofarm V14.3 (Smart Mine + Auto-Sell) Loaded.")
+print("🚀 Autofarm V14.4 (Smart Mine + Auto-Sell) Loaded.")
