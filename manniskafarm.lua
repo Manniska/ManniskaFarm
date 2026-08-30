@@ -2971,9 +2971,15 @@ end
 local function aimAt(targetPos)
     local cam = workspace.CurrentCamera
     if cam then cam.CFrame = CFrame.lookAt(cam.CFrame.Position, targetPos) end
-    local _, r = getCharacter()
+    local _, r, h = getCharacter()
     if r then
+        -- PlatformStand trick: releasing humanoid drag/animation control briefly lets
+        -- the root CFrame rotation stick even while a pickaxe tool is equipped (which
+        -- otherwise overrides the facing).
+        local wasStanding = false
+        if h then wasStanding = h.PlatformStand; h.PlatformStand = true end
         r.CFrame = CFrame.lookAt(r.Position, Vector3.new(targetPos.X, r.Position.Y, targetPos.Z))
+        if h then h.PlatformStand = wasStanding end
     end
 end
 
@@ -3016,6 +3022,9 @@ local function executeMiningNode(data, root)
         end)
     end
     task.wait(0.8)
+    -- Re-snap facing AFTER equipping: equipping overrides the pre-equip aim, so
+    -- re-apply with the PlatformStand trick so the character faces the deposit.
+    aimAt(targetPosition)
 
     local manualTimer = data.actionHoldDuration or 15.0
 
@@ -3087,9 +3096,8 @@ local function executeMiningNode(data, root)
                 pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0) end)
             end
 
-            -- ANTI-CHEAT FIX: 0.85s to 1.15s cooldown strictly obeys TWW's internal pickaxe speeds.
-            -- This prevents the "mining too fast (600s)" flag completely.
-            local legalSwingCooldown = 0.85 + (math.random(0, 30) / 100)
+            -- ANTI-CHEAT FIX: Tuned specifically for the Basic Pickaxe (0.95s base + 0.00 to 0.15s human randomization)
+            local legalSwingCooldown = 0.95 + (math.random(0, 15) / 100)
             task.wait(legalSwingCooldown)
         end
     else
@@ -3105,7 +3113,8 @@ local function executeMiningNode(data, root)
                 pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0) end)
             end
             
-            local legalSwingCooldown = 0.85 + (math.random(0, 30) / 100)
+            -- ANTI-CHEAT FIX: Tuned specifically for the Basic Pickaxe (0.95s base + 0.00 to 0.15s human randomization)
+            local legalSwingCooldown = 0.95 + (math.random(0, 15) / 100)
             task.wait(legalSwingCooldown)
         end
     end
@@ -3266,8 +3275,16 @@ local function navigateToPoint(targetPosition, maxSpeed)
         return true
     end
 
+    -- Timeout now scales with the REAL walk speed (callers already pass
+    -- maxSpeed with multipliers applied), plus a 2s buffer and 1.6x margin for
+    -- pathing/obstacles. No more 5s hard cap that cut long walks short.
+    local realSpeed = math.max(maxSpeed or 16, 4)
+    local maxTimeout = math.clamp((totalDistance / realSpeed) * 1.6 + 2.0, 1.2, 120.0)
     local timeout = 0
-    local maxTimeout = math.clamp(totalDistance / 6, 1.2, 5.0) / Config.SpeedMultiplier
+    -- Progress tracking: bail only if we stop getting closer for ~2.5s (stuck
+    -- on an obstacle), otherwise keep walking the full distance.
+    local lastDist = totalDistance
+    local stallSince = tick()
 
     while isPlaying do
         local _, curR, curH = getCharacter()
@@ -3280,6 +3297,13 @@ local function navigateToPoint(targetPosition, maxSpeed)
         if flatDist <= threshold then
             break
         end
+
+        if flatDist >= lastDist - 0.3 then
+            if tick() - stallSince > 2.5 then break end
+        else
+            stallSince = tick()
+        end
+        lastDist = flatDist
 
         local moveDir = flatDelta.Unit
         local s = (curH and curH.WalkSpeed > 0 and curH.WalkSpeed) or (maxSpeed or 16)
