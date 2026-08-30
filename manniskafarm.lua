@@ -590,6 +590,7 @@ task.spawn(function()
                             txt.TextStrokeTransparency = 0.2
                             txt.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Heavy)
                             txt.TextSize = 13
+			    txt.AutoLocalize = false -- ANTI-CRASH FIX: Stops Roblox from frantically translating rapidly changing distance numbers
                             txt.Parent = bg
                             bg.Parent = espFolder
 
