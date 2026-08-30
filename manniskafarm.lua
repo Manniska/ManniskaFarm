@@ -2997,7 +2997,10 @@ local function executeMiningNode(data, root)
         local approachStart = tick()
         while isPlaying and (tick() - approachStart) < 6.0 do
             local flatDist = (Vector3.new(targetPosition.X, 0, targetPosition.Z) - Vector3.new(appRoot.Position.X, 0, appRoot.Position.Z)).Magnitude
-            if flatDist <= 4.5 then break end
+            
+            -- ANTI-CHEAT FIX: Stop at 7.0 studs instead of 4.5. This prevents the character from clipping inside 
+            -- the ore mesh, which causes pickaxe raycasts to originate from inside the rock and flag the anti-cheat.
+            if flatDist <= 7.0 then break end
             local dir = (Vector3.new(targetPosition.X, appRoot.Position.Y, targetPosition.Z) - appRoot.Position).Unit
             if hum then hum:Move(dir, true) end
             appRoot.AssemblyLinearVelocity = dir * (16 * Config.SpeedMultiplier)
@@ -3050,7 +3053,8 @@ local function executeMiningNode(data, root)
             end
         end
 
-        local miningStartPosition = targetPosition
+        -- ANTI-CHEAT FIX: Anchor the drift calculation to where the character ACTUALLY stopped, not the rock's core.
+        local miningStartPosition = root and root.Position or targetPosition
         local maxDriftDistance = 8.0
 
         local aimConn = game:GetService("RunService").RenderStepped:Connect(function()
