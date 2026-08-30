@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V15.1 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V15.2 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -325,7 +325,7 @@ local bootSub = Instance.new("TextLabel")
 bootSub.Size = UDim2.new(1, 0, 0, 16)
 bootSub.Position = UDim2.new(0, 0, 0, 52)
 bootSub.BackgroundTransparency = 1
-bootSub.Text = "V15.1 • INITIALIZING SUBSYSTEMS"
+bootSub.Text = "V15.2 • INITIALIZING SUBSYSTEMS"
 bootSub.TextColor3 = Color3.fromRGB(0, 170, 255)
 bootSub.TextSize = 11
 bootSub.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -895,7 +895,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V15.1"
+    titleLabel.Text = "MANNISKAFARM V15.2"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -3053,6 +3053,15 @@ local function executeMiningNode(data, root)
         local miningStartPosition = targetPosition
         local maxDriftDistance = 8.0
 
+        -- Camera lock: re-aim EVERY rendered frame during mining so the game's
+        -- camera module can't reset the view before our screen-center clicks land.
+        local aimConn = game:GetService("RunService").RenderStepped:Connect(function()
+            if isPlaying and targetPosition then
+                local cam2 = workspace.CurrentCamera
+                if cam2 then cam2.CFrame = CFrame.lookAt(cam2.CFrame.Position, targetPosition) end
+            end
+        end)
+
         while isPlaying and tick() < timeOut do
             -- 0. DEPLETED CHECK (BEFORE each swing): if THIS rock ran out, stop now
             --    so we don't swing at an empty rock (which triggers the "mining
@@ -3100,6 +3109,8 @@ local function executeMiningNode(data, root)
             local legalSwingCooldown = 0.95 + (math.random(0, 15) / 100)
             task.wait(legalSwingCooldown)
         end
+
+        aimConn:Disconnect() -- release camera lock when smart mining ends
     else
         -- MANUAL BRANCH: Blind Swing Timer with Legal Rhythm
         showToast(string.format("Blind Mining: %.1fs", manualTimer))
@@ -3275,16 +3286,19 @@ local function navigateToPoint(targetPosition, maxSpeed)
         return true
     end
 
-    -- Timeout now scales with the REAL walk speed (callers already pass
-    -- maxSpeed with multipliers applied), plus a 2s buffer and 1.6x margin for
-    -- pathing/obstacles. No more 5s hard cap that cut long walks short.
+    -- Timeout scales with the REAL walk speed + 3s buffer + 1.8x margin for
+    -- pathing/obstacles. No per-second hard cap that killed long walks, and no
+    -- aggressive stall-bail that made the character freeze mid-route.
     local realSpeed = math.max(maxSpeed or 16, 4)
-    local maxTimeout = math.clamp((totalDistance / realSpeed) * 1.6 + 2.0, 1.2, 120.0)
+    local maxTimeout = math.clamp((totalDistance / realSpeed) * 1.8 + 3.0, 4.0, 180.0)
     local timeout = 0
-    -- Progress tracking: bail only if we stop getting closer for ~2.5s (stuck
-    -- on an obstacle), otherwise keep walking the full distance.
+
+    -- Progress fallback: MoveTo handles pathing, but if it makes no progress
+    -- for ~3s (path not found / stuck behind something), force-move the root
+    -- with the same velocity method used between close nodes, until it arrives.
+    local velocityMode = false
     local lastDist = totalDistance
-    local stallSince = tick()
+    local lastProgress = tick()
 
     while isPlaying do
         local _, curR, curH = getCharacter()
@@ -3298,25 +3312,26 @@ local function navigateToPoint(targetPosition, maxSpeed)
             break
         end
 
-        if flatDist >= lastDist - 0.3 then
-            if tick() - stallSince > 2.5 then break end
-        else
-            stallSince = tick()
+        if flatDist < lastDist - 0.3 then
+            lastDist = flatDist
+            lastProgress = tick()
+        elseif tick() - lastProgress > 3.0 then
+            velocityMode = true
         end
-        lastDist = flatDist
 
         local moveDir = flatDelta.Unit
         local s = (curH and curH.WalkSpeed > 0 and curH.WalkSpeed) or (maxSpeed or 16)
 
         if curH then
             curH:MoveTo(targetPosition)
-            if curH.FloorMaterial == Enum.Material.Air and flatDist > 1.0 then
-                curR.AssemblyLinearVelocity = Vector3.new(moveDir.X * s, curR.AssemblyLinearVelocity.Y, moveDir.Z * s)
-            end
-        else
-            curR.AssemblyLinearVelocity = Vector3.new(moveDir.X * s, curR.AssemblyLinearVelocity.Y, moveDir.Z * s)
-            curR.CFrame = CFrame.lookAt(curR.Position, Vector3.new(targetPosition.X, curR.Position.Y, targetPosition.Z))
         end
+
+        -- Force-move when pathing stalls (or when airborne) so we always advance.
+        if velocityMode or (curH and curH.FloorMaterial == Enum.Material.Air and flatDist > 1.0) or not curH then
+            curR.AssemblyLinearVelocity = Vector3.new(moveDir.X * s, curR.AssemblyLinearVelocity.Y, moveDir.Z * s)
+        end
+
+        curR.CFrame = CFrame.lookAt(curR.Position, Vector3.new(targetPosition.X, curR.Position.Y, targetPosition.Z))
 
         timeout = timeout + 0.03
         if timeout > maxTimeout then
@@ -3332,14 +3347,34 @@ end
 -- =====================================================================
 -- AUTO-SELL & BREADCRUMB BACKTRACKING SYSTEM
 -- =====================================================================
+local lastSellTime = 0
 local function checkInventoryFull()
     if not Config.AutoSellEnabled then return false end
-    local customTrigger = string.lower(Config.InventoryFullText or "inventory full")
-    
+    -- Cooldown: never retrigger a sell-route within 60s of the last one, so a
+    -- lingering / unrelated "cannot carry" message can't spam sell trips.
+    if tick() - lastSellTime < 60 then return false end
+
+    local customTrigger = string.lower(Config.InventoryFullText or "")
     for _, desc in ipairs(playerGui:GetDescendants()) do
         if desc:IsA("TextLabel") and desc.Visible then
             local txt = string.lower(desc.Text)
-            if string.find(txt, "inventory full") or string.find(txt, "backpack full") or (customTrigger ~= "" and string.find(txt, customTrigger)) then
+            if string.find(txt, "inventory full")
+                or string.find(txt, "backpack full")
+                or string.find(txt, "bag full")
+            then
+                return true
+            end
+            -- "cannot carry" only counts when paired with an inventory/backpack
+            -- word, so generic shop/tutorial text doesn't false-trigger.
+            if string.find(txt, "cannot carry")
+                and (string.find(txt, "inventory") or string.find(txt, "backpack") or string.find(txt, "bag"))
+            then
+                return true
+            end
+            if customTrigger ~= ""
+                and customTrigger ~= "cannot carry"
+                and string.find(txt, customTrigger)
+            then
                 return true
             end
         end
@@ -3524,6 +3559,7 @@ startPlayback = function()
                         
                         -- Breadcrumb Auto-Sell Hook
                         if Config.AutoSellEnabled and checkInventoryFull() then
+                            lastSellTime = tick() -- stamp the sell cooldown
                             showToast("🎒 Backpack Full! Backtracking to Anchor...")
                             for rev = i, 1, -1 do
                                 if not isPlaying then break end
@@ -4017,5 +4053,5 @@ for _, item in ipairs(mainFrame:GetDescendants()) do
 end
 mainFrame.BackgroundTransparency = 0.15
 
-print("🚀 Autofarm V15.1 (Smart Mine + Auto-Sell) Loaded.")
+print("🚀 Autofarm V15.2 (Smart Mine + Auto-Sell) Loaded.")
     end
