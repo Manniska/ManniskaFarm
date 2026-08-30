@@ -154,7 +154,7 @@ local Config = {
     -- Mining Config
     SmartMiningEnabled = false,
     AutoLootGems = true,
-    MiningFailsafeTimeout = 20,
+    MiningFailsafeTimeout = 600, -- safety net only; smart mining ends on depletion text, not this timer
     OreESPEnabled = false,
     AutoStampNodes = false,
     AutoSellEnabled = false,
@@ -2984,18 +2984,14 @@ local function aimAt(targetPos)
 end
 
 local function executeMiningNode(data, root)
-    -- LIVE ROCK RE-SCAN: Don't trust stale recorded positions. Use the actual
-    -- rock currently in the world near the node so we aren't "too far" or
-    -- swinging at a despawned spot.
+    -- LIVE ROCK RE-SCAN: Don't trust stale recorded positions.
     local baseTarget = data.promptPos or data.pos
     local liveRock = findNearestRock(baseTarget, 30)
     local targetPosition = liveRock and liveRock.Position or baseTarget
     local camera = workspace.CurrentCamera
     local _, _, hum = getCharacter()
 
-    -- APPROACH: Close the gap to the live rock before swinging so screen-center
-    -- clicks connect. Inline navigator (navigateToPoint is declared later, so we
-    -- can't call it here).
+    -- APPROACH: Close the gap to the live rock before swinging
     local _, appRoot = getCharacter()
     if appRoot and targetPosition then
         local approachStart = tick()
@@ -3022,23 +3018,24 @@ local function executeMiningNode(data, root)
         end)
     end
     task.wait(0.8)
-    -- Re-snap facing AFTER equipping: equipping overrides the pre-equip aim, so
-    -- re-apply with the PlatformStand trick so the character faces the deposit.
     aimAt(targetPosition)
 
     local manualTimer = data.actionHoldDuration or 15.0
+    
+    -- ANTI-CHEAT: Calculate the absolute center of the screen to click on
+    local cx = camera and math.floor(camera.ViewportSize.X / 2) or 0
+    local cy = camera and math.floor(camera.ViewportSize.Y / 2) or 0
 
     if Config.SmartMiningEnabled then
-        local timeOut = tick() + Config.MiningFailsafeTimeout
-        
-        -- BLIND SPOT: Ignore all completion text for the first 2.0 seconds.
-        -- This ensures fading red text from the PREVIOUS rock doesn't trigger an early exit.
+        -- Failsafe is only a safety net (default 600s). Mining normally ends when
+        -- the depletion text appears. If no live rock was found at this node,
+        -- blind-swing briefly so a stale node doesn't hang for the full failsafe.
+        local failsafe = Config.MiningFailsafeTimeout
+        if not liveRock then failsafe = math.min(failsafe, 25) end
+        local timeOut = tick() + failsafe
         local textGracePeriod = tick() + 2.0 
-        -- REQUIRE persistent confirmation before declaring depletion.
-        -- Snapshot whether "No ore remaining!" text is ALREADY showing when we
-        -- arrive (stale from the PREVIOUS rock). Only count it as THIS rock
-        -- depleting if the text appears AFTER we started swinging.
         local depleteTextAtStart = false
+        
         for _, desc in ipairs(playerGui:GetDescendants()) do
             if desc:IsA("TextLabel") and desc.Visible then
                 local t = string.lower(desc.Text)
@@ -3049,24 +3046,28 @@ local function executeMiningNode(data, root)
             end
         end
 
-        -- Position lock: record where we started mining
         local miningStartPosition = targetPosition
         local maxDriftDistance = 8.0
 
-        -- Camera lock: re-aim EVERY rendered frame during mining so the game's
-        -- camera module can't reset the view before our screen-center clicks land.
         local aimConn = game:GetService("RunService").RenderStepped:Connect(function()
             if isPlaying and targetPosition then
                 local cam2 = workspace.CurrentCamera
-                if cam2 then cam2.CFrame = CFrame.lookAt(cam2.CFrame.Position, targetPosition) end
+                -- Micro-jitter to mask the bot's static camera angle
+                local jitterX = (math.random(-2, 2) / 1000)
+                local jitterY = (math.random(-2, 2) / 1000)
+                local jitterZ = (math.random(-2, 2) / 1000)
+                local hTarget = targetPosition + Vector3.new(jitterX, jitterY, jitterZ)
+                if cam2 then cam2.CFrame = CFrame.lookAt(cam2.CFrame.Position, hTarget) end
             end
         end)
 
+        -- hold-to-mine phase: Press Mouse 1 DOWN and hold it 
+        if VirtualInputManager then
+            pcall(function() VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, true, game, 0) end)
+        end
+
         while isPlaying and tick() < timeOut do
-            -- 0. DEPLETED CHECK (BEFORE each swing): if THIS rock ran out, stop now
-            --    so we don't swing at an empty rock (which triggers the "mining
-            --    too fast 600s" anti-cheat). Only treat it as depleting if the text
-            --    was NOT already showing when we arrived (stale from PREVIOUS rock).
+            -- Look for completion text
             if tick() > textGracePeriod then
                 local sawDepleteText = false
                 for _, desc in ipairs(playerGui:GetDescendants()) do
@@ -3085,48 +3086,42 @@ local function executeMiningNode(data, root)
                 end
             end
 
-            -- Anti-Drift: snap back if pushed by collision
+            -- Anti-Drift Check
             local _, curRoot, _ = getCharacter()
             if curRoot then
                 local drift = (curRoot.Position - miningStartPosition).Magnitude
                 if drift > maxDriftDistance then
                     curRoot.AssemblyLinearVelocity = Vector3.zero
                     aimAt(targetPosition)
-                    task.wait(0.1)
                 end
             end
 
-            -- Legal Humanized Swing
-            -- We click once per loop instead of spamming.
-            aimAt(targetPosition) -- Re-aim each swing so screen-center clicks hit the rock
-            if VirtualInputManager then
-                pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0) end)
-                task.wait(0.1) -- Natural click depression time
-                pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0) end)
-            end
-
-            -- ANTI-CHEAT FIX: Tuned specifically for the Basic Pickaxe (0.95s base + 0.00 to 0.15s human randomization)
-            local legalSwingCooldown = 0.95 + (math.random(0, 15) / 100)
-            task.wait(legalSwingCooldown)
+            task.wait(0.05) -- Fast check loop while the game natively swings the pickaxe
         end
 
-        aimConn:Disconnect() -- release camera lock when smart mining ends
+        -- release phase: Let go of Mouse 1
+        if VirtualInputManager then
+            pcall(function() VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, false, game, 0) end)
+        end
+
+        aimConn:Disconnect()
     else
-        -- MANUAL BRANCH: Blind Swing Timer with Legal Rhythm
         showToast(string.format("Blind Mining: %.1fs", manualTimer))
         local swingStart = tick()
+        
+        -- hold-to-mine phase: Press Mouse 1 DOWN
+        if VirtualInputManager then
+            pcall(function() VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, true, game, 0) end)
+        end
+        
         while isPlaying and (tick() - swingStart) < manualTimer do
-            aimAt(targetPosition) -- Re-aim each swing so screen-center clicks hit the rock
-            
-            if VirtualInputManager then
-                pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0) end)
-                task.wait(0.1)
-                pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0) end)
-            end
-            
-            -- ANTI-CHEAT FIX: Tuned specifically for the Basic Pickaxe (0.95s base + 0.00 to 0.15s human randomization)
-            local legalSwingCooldown = 0.95 + (math.random(0, 15) / 100)
-            task.wait(legalSwingCooldown)
+            aimAt(targetPosition)
+            task.wait(0.05)
+        end
+        
+        -- release phase: Let go of Mouse 1
+        if VirtualInputManager then
+            pcall(function() VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, false, game, 0) end)
         end
     end
 
@@ -3281,22 +3276,23 @@ local function navigateToPoint(targetPosition, maxSpeed)
     local totalDelta = Vector3.new(targetPosition.X - currentPos.X, 0, targetPosition.Z - currentPos.Z)
     local totalDistance = totalDelta.Magnitude
 
-    local threshold = 2.0 * Config.SpeedMultiplier
+    local threshold = math.min(2.0 * math.max(Config.SpeedMultiplier, 1), 3.0)
     if totalDistance <= threshold then
         return true
     end
 
     -- Timeout scales with the REAL walk speed + 3s buffer + 1.8x margin for
-    -- pathing/obstacles. No per-second hard cap that killed long walks, and no
-    -- aggressive stall-bail that made the character freeze mid-route.
+    -- pathing/obstacles. No per-second hard cap that killed long walks.
     local realSpeed = math.max(maxSpeed or 16, 4)
     local maxTimeout = math.clamp((totalDistance / realSpeed) * 1.8 + 3.0, 4.0, 180.0)
     local timeout = 0
 
-    -- Progress fallback: MoveTo handles pathing, but if it makes no progress
-    -- for ~3s (path not found / stuck behind something), force-move the root
-    -- with the same velocity method used between close nodes, until it arrives.
-    local velocityMode = false
+    -- Two movement modes:
+    --  * Short hops (<=25 studs): MoveTo, the proven between-node method.
+    --  * Long segments: force-walk straight line via native Humanoid:Move +
+    --    assembly velocity, because MoveTo can silently stall on long paths.
+    --    Escalates to force-walk after 1.2s of no progress too.
+    local forceMode = totalDistance > 25
     local lastDist = totalDistance
     local lastProgress = tick()
 
@@ -3312,28 +3308,26 @@ local function navigateToPoint(targetPosition, maxSpeed)
             break
         end
 
-        if flatDist < lastDist - 0.3 then
-            lastDist = flatDist
-            lastProgress = tick()
-        elseif tick() - lastProgress > 3.0 then
-            velocityMode = true
+        if not forceMode then
+            if flatDist < lastDist - 0.3 then
+                lastDist = flatDist
+                lastProgress = tick()
+            elseif tick() - lastProgress > 1.2 then
+                forceMode = true
+            end
         end
 
         local moveDir = flatDelta.Unit
         local s = (curH and curH.WalkSpeed > 0 and curH.WalkSpeed) or (maxSpeed or 16)
 
         if curH then
-            -- Let the humanoid path normally (this is what works reliably on the
-            -- ground). Do NOT snap the root CFrame here -- overriding it every
-            -- frame cancels MoveTo and the character freezes in place.
-            curH:MoveTo(targetPosition)
-            -- Velocity force-move only when pathing stalled (velocityMode) or the
-            -- character is airborne, so we always advance.
-            if velocityMode or (curH.FloorMaterial == Enum.Material.Air and flatDist > 1.0) then
+            if forceMode then
+                -- Force-walk: native move + velocity. No MoveTo, so no CFrame
+                -- snap conflicts; the humanoid faces its move direction itself.
+                curH:Move(moveDir, false)
                 curR.AssemblyLinearVelocity = Vector3.new(moveDir.X * s, curR.AssemblyLinearVelocity.Y, moveDir.Z * s)
-            end
-            if velocityMode then
-                curR.CFrame = CFrame.lookAt(curR.Position, Vector3.new(targetPosition.X, curR.Position.Y, targetPosition.Z))
+            else
+                curH:MoveTo(targetPosition)
             end
         else
             curR.AssemblyLinearVelocity = Vector3.new(moveDir.X * s, curR.AssemblyLinearVelocity.Y, moveDir.Z * s)
@@ -3363,8 +3357,20 @@ local function checkInventoryFull()
 
     local customTrigger = string.lower(Config.InventoryFullText or "")
     for _, desc in ipairs(playerGui:GetDescendants()) do
+        -- Never match text from our OWN GUI (HUD/ESP/toasts), only the game's UI.
+        if screenGui and desc:IsDescendantOf(screenGui) then continue end
         if desc:IsA("TextLabel") and desc.Visible then
             local txt = string.lower(desc.Text)
+            -- Definitive backpack counter: "40/40" is full when both sides are
+            -- equal. Only acts on real capacities (>=10) so quest counters like
+            -- "1/1" or "2/2" can't false-trigger a sell trip.
+            local filled, cap = txt:match("(%d+)/(%d+)")
+            if filled and cap
+                and tonumber(cap) >= 10
+                and tonumber(filled) >= tonumber(cap)
+            then
+                return true
+            end
             if string.find(txt, "inventory full")
                 or string.find(txt, "backpack full")
                 or string.find(txt, "bag full")
@@ -3394,8 +3400,11 @@ local function executeSubRoute(routeName)
     local backupWaypoints = Waypoints
     loadRouteFromFile(routeName)
     
-    if #Waypoints == 0 then
-        showToast("Sub-route empty or missing: " .. routeName)
+    -- Detect load failure: if the file was missing, loadRouteFromFile left
+    -- Waypoints pointing at the SAME main-route table (not a new one), so we'd
+    -- otherwise silently re-run the main route instead of the sub-route.
+    if Waypoints == backupWaypoints or #Waypoints == 0 then
+        showToast("Sub-route missing or failed to load: " .. routeName)
         Waypoints = backupWaypoints
         renderVisualPath(Waypoints)
         return false
