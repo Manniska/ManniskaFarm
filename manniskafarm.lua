@@ -2947,17 +2947,65 @@ end)
 -- =====================================================================
 -- HYBRID MINING ENGINE (LEGAL HUMAN SWING + BLINDSPOT TEXT CHECK)
 -- =====================================================================
+local function findNearestRock(originPos, radius)
+    local overlapParams = OverlapParams.new()
+    overlapParams.MaxParts = 2000
+    local nearbyParts = workspace:GetPartBoundsInRadius(originPos, radius or 30, overlapParams)
+    local bestPart = nil
+    local bestDist = (radius or 30) + 1
+    for _, part in ipairs(nearbyParts) do
+        if part:IsA("BasePart") then
+            local pName = string.lower(part.Name)
+            if pName == "rockbase" or pName == "rockore" then
+                local dist = (part.Position - originPos).Magnitude
+                if dist < bestDist then
+                    bestDist = dist
+                    bestPart = part
+                end
+            end
+        end
+    end
+    return bestPart
+end
+
+local function aimAt(targetPos)
+    local cam = workspace.CurrentCamera
+    if cam then cam.CFrame = CFrame.lookAt(cam.CFrame.Position, targetPos) end
+    local _, r = getCharacter()
+    if r then
+        r.CFrame = CFrame.lookAt(r.Position, Vector3.new(targetPos.X, r.Position.Y, targetPos.Z))
+    end
+end
+
 local function executeMiningNode(data, root)
-    local targetPosition = data.promptPos or data.pos
+    -- LIVE ROCK RE-SCAN: Don't trust stale recorded positions. Use the actual
+    -- rock currently in the world near the node so we aren't "too far" or
+    -- swinging at a despawned spot.
+    local baseTarget = data.promptPos or data.pos
+    local liveRock = findNearestRock(baseTarget, 30)
+    local targetPosition = liveRock and liveRock.Position or baseTarget
     local camera = workspace.CurrentCamera
     local _, _, hum = getCharacter()
 
-    if hum then hum:Move(Vector3.zero, false) end
-    if root then 
-        root.AssemblyLinearVelocity = Vector3.zero 
-        root.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetPosition.X, root.Position.Y, targetPosition.Z))
+    -- APPROACH: Close the gap to the live rock before swinging so screen-center
+    -- clicks connect. Inline navigator (navigateToPoint is declared later, so we
+    -- can't call it here).
+    local _, appRoot = getCharacter()
+    if appRoot and targetPosition then
+        local approachStart = tick()
+        while isPlaying and (tick() - approachStart) < 6.0 do
+            local flatDist = (Vector3.new(targetPosition.X, 0, targetPosition.Z) - Vector3.new(appRoot.Position.X, 0, appRoot.Position.Z)).Magnitude
+            if flatDist <= 4.5 then break end
+            local dir = (Vector3.new(targetPosition.X, appRoot.Position.Y, targetPosition.Z) - appRoot.Position).Unit
+            if hum then hum:Move(dir, true) end
+            appRoot.AssemblyLinearVelocity = dir * (16 * Config.SpeedMultiplier)
+            task.wait(0.05)
+        end
     end
-    if camera then camera.CFrame = CFrame.lookAt(camera.CFrame.Position, targetPosition) end
+
+    if hum then hum:Move(Vector3.zero, false) end
+    if root then root.AssemblyLinearVelocity = Vector3.zero end
+    aimAt(targetPosition)
 
     -- Phase 0: Auto-Equip Pickaxe (Slot 4)
     if VirtualInputManager then
@@ -2989,13 +3037,14 @@ local function executeMiningNode(data, root)
                 local drift = (curRoot.Position - miningStartPosition).Magnitude
                 if drift > maxDriftDistance then
                     curRoot.AssemblyLinearVelocity = Vector3.zero
-                    curRoot.CFrame = CFrame.lookAt(curRoot.Position, Vector3.new(targetPosition.X, curRoot.Position.Y, targetPosition.Z))
+                    aimAt(targetPosition)
                     task.wait(0.1)
                 end
             end
 
             -- 1. Legal Humanized Swing
             -- We click once per loop instead of spamming.
+            aimAt(targetPosition) -- Re-aim each swing so screen-center clicks hit the rock
             if VirtualInputManager then
                 pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0) end)
                 task.wait(0.1) -- Natural click depression time
@@ -3031,9 +3080,7 @@ local function executeMiningNode(data, root)
         showToast(string.format("Blind Mining: %.1fs", manualTimer))
         local swingStart = tick()
         while isPlaying and (tick() - swingStart) < manualTimer do
-            if root and targetPosition then
-                root.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetPosition.X, root.Position.Y, targetPosition.Z))
-            end
+            aimAt(targetPosition) -- Re-aim each swing so screen-center clicks hit the rock
             
             if VirtualInputManager then
                 pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0) end)
