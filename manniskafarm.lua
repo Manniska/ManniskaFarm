@@ -3323,15 +3323,22 @@ local function navigateToPoint(targetPosition, maxSpeed)
         local s = (curH and curH.WalkSpeed > 0 and curH.WalkSpeed) or (maxSpeed or 16)
 
         if curH then
+            -- Let the humanoid path normally (this is what works reliably on the
+            -- ground). Do NOT snap the root CFrame here -- overriding it every
+            -- frame cancels MoveTo and the character freezes in place.
             curH:MoveTo(targetPosition)
-        end
-
-        -- Force-move when pathing stalls (or when airborne) so we always advance.
-        if velocityMode or (curH and curH.FloorMaterial == Enum.Material.Air and flatDist > 1.0) or not curH then
+            -- Velocity force-move only when pathing stalled (velocityMode) or the
+            -- character is airborne, so we always advance.
+            if velocityMode or (curH.FloorMaterial == Enum.Material.Air and flatDist > 1.0) then
+                curR.AssemblyLinearVelocity = Vector3.new(moveDir.X * s, curR.AssemblyLinearVelocity.Y, moveDir.Z * s)
+            end
+            if velocityMode then
+                curR.CFrame = CFrame.lookAt(curR.Position, Vector3.new(targetPosition.X, curR.Position.Y, targetPosition.Z))
+            end
+        else
             curR.AssemblyLinearVelocity = Vector3.new(moveDir.X * s, curR.AssemblyLinearVelocity.Y, moveDir.Z * s)
+            curR.CFrame = CFrame.lookAt(curR.Position, Vector3.new(targetPosition.X, curR.Position.Y, targetPosition.Z))
         end
-
-        curR.CFrame = CFrame.lookAt(curR.Position, Vector3.new(targetPosition.X, curR.Position.Y, targetPosition.Z))
 
         timeout = timeout + 0.03
         if timeout > maxTimeout then
