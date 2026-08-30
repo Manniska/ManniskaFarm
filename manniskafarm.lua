@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V14.9 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V15.0 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -324,7 +324,7 @@ local bootSub = Instance.new("TextLabel")
 bootSub.Size = UDim2.new(1, 0, 0, 16)
 bootSub.Position = UDim2.new(0, 0, 0, 52)
 bootSub.BackgroundTransparency = 1
-bootSub.Text = "V14.9 • INITIALIZING SUBSYSTEMS"
+bootSub.Text = "V15.0 • INITIALIZING SUBSYSTEMS"
 bootSub.TextColor3 = Color3.fromRGB(0, 170, 255)
 bootSub.TextSize = 11
 bootSub.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -484,13 +484,14 @@ setHaloTarget = function(pos)
 end
 
 -- =====================================================================
--- ZERO-LAG SPATIAL ORE ESP (V5 Logic)
+-- ZERO-LAG SPATIAL ORE ESP (V5 Logic) - MEMORY LEAK FIXED
 -- =====================================================================
 local espFolder = workspace:FindFirstChild("ManniskaOreESP") or Instance.new("Folder")
 espFolder.Name = "ManniskaOreESP"
 espFolder.Parent = workspace
 
 local cachedESPModels = {}
+local activeESPObjects = {} -- Map: Model -> {Highlight, Billboard, Label}
 
 task.spawn(function()
     while true do
@@ -498,18 +499,20 @@ task.spawn(function()
             local _, rootPart = getCharacter()
             if rootPart then
                 local overlapParams = OverlapParams.new()
-                overlapParams.MaxParts = 5000
+                overlapParams.MaxParts = 2000
                 local nearbyParts = workspace:GetPartBoundsInRadius(rootPart.Position, 150, overlapParams)
                 
                 local newCache = {}
                 local seenModels = {}
                 for _, part in ipairs(nearbyParts) do
-                    local pName = string.lower(part.Name)
-                    if pName == "rockbase" or pName == "rockore" then
-                        local model = part:FindFirstAncestorOfClass("Model") or part.Parent
-                        if model and not seenModels[model] then
-                            seenModels[model] = true
-                            table.insert(newCache, model)
+                    if part:IsA("BasePart") then
+                        local pName = string.lower(part.Name)
+                        if pName == "rockbase" or pName == "rockore" then
+                            local model = part:FindFirstAncestorOfClass("Model") or part.Parent
+                            if model and not seenModels[model] then
+                                seenModels[model] = true
+                                table.insert(newCache, model)
+                            end
                         end
                     end
                 end
@@ -517,7 +520,6 @@ task.spawn(function()
             end
         else
             cachedESPModels = {}
-            espFolder:ClearAllChildren()
         end
         task.wait(1.0)
     end
@@ -526,12 +528,14 @@ end)
 task.spawn(function()
     while true do
         if Config.OreESPEnabled then
-            espFolder:ClearAllChildren()
             local _, rootPart = getCharacter()
             local pPos = rootPart and rootPart.Position or nil
 
+            -- 1. Create or Update ESP for cached models
+            local currentModelsMap = {}
             for _, model in ipairs(cachedESPModels) do
                 if model and model.Parent then
+                    currentModelsMap[model] = true
                     local primary = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
                     if primary then
                         local hasBase = false
@@ -566,33 +570,58 @@ task.spawn(function()
                             end
                         end
 
-                        local hl = Instance.new("Highlight")
-                        hl.Adornee = model
-                        hl.FillColor = highlightColor
-                        hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-                        hl.FillTransparency = 0.6
-                        hl.OutlineTransparency = 0.2
-                        hl.Parent = espFolder
-                        
-                        local bg = Instance.new("BillboardGui")
-                        bg.Adornee = primary
-                        bg.Size = UDim2.new(0, 150, 0, 40)
-                        bg.StudsOffset = Vector3.new(0, 5, 0)
-                        bg.AlwaysOnTop = true
-                        
-                        local txt = Instance.new("TextLabel")
-                        txt.Size = UDim2.new(1, 0, 1, 0)
-                        txt.BackgroundTransparency = 1
-                        txt.Text = statusText .. distStr
-                        txt.TextColor3 = highlightColor
-                        txt.TextStrokeTransparency = 0.2
-                        txt.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Heavy)
-                        txt.TextSize = 13
-                        txt.Parent = bg
-                        bg.Parent = espFolder
+                        -- Check if ESP objects already exist; if not, create them ONCE
+                        if not activeESPObjects[model] then
+                            local hl = Instance.new("Highlight")
+                            hl.Adornee = model
+                            hl.FillTransparency = 0.6
+                            hl.OutlineTransparency = 0.2
+                            hl.Parent = espFolder
+                            
+                            local bg = Instance.new("BillboardGui")
+                            bg.Adornee = primary
+                            bg.Size = UDim2.new(0, 150, 0, 40)
+                            bg.StudsOffset = Vector3.new(0, 5, 0)
+                            bg.AlwaysOnTop = true
+                            
+                            local txt = Instance.new("TextLabel")
+                            txt.Size = UDim2.new(1, 0, 1, 0)
+                            txt.BackgroundTransparency = 1
+                            txt.TextStrokeTransparency = 0.2
+                            txt.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Heavy)
+                            txt.TextSize = 13
+                            txt.Parent = bg
+                            bg.Parent = espFolder
+
+                            activeESPObjects[model] = { Highlight = hl, Billboard = bg, Label = txt }
+                        end
+
+                        -- Update existing ESP cleanly without re-instantiating
+                        local esp = activeESPObjects[model]
+                        esp.Highlight.FillColor = highlightColor
+                        esp.Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                        esp.Label.Text = statusText .. distStr
+                        esp.Label.TextColor3 = highlightColor
                     end
                 end
             end
+
+            -- 2. Cleanup old ESP for models no longer in cache
+            for model, esp in pairs(activeESPObjects) do
+                if not currentModelsMap[model] or not model.Parent then
+                    if esp.Highlight then esp.Highlight:Destroy() end
+                    if esp.Billboard then esp.Billboard:Destroy() end
+                    activeESPObjects[model] = nil
+                end
+            end
+
+        else
+            -- If ESP is toggled off, cleanly destroy all visuals
+            for model, esp in pairs(activeESPObjects) do
+                if esp.Highlight then esp.Highlight:Destroy() end
+                if esp.Billboard then esp.Billboard:Destroy() end
+            end
+            table.clear(activeESPObjects)
         end
         task.wait(0.2)
     end
@@ -859,7 +888,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V14.9"
+    titleLabel.Text = "MANNISKAFARM V15.0"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -3876,4 +3905,4 @@ for _, item in ipairs(mainFrame:GetDescendants()) do
 end
 mainFrame.BackgroundTransparency = 0.15
 
-print("🚀 Autofarm V14.9 (Smart Mine + Auto-Sell) Loaded.")
+print("🚀 Autofarm V15.0 (Smart Mine + Auto-Sell) Loaded.")
