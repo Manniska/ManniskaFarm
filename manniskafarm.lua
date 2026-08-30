@@ -525,6 +525,75 @@ task.spawn(function()
     end
 end)
 
+local function renderESPForModel(model, pPos)
+    if not model or not model.Parent then return end
+    local primary = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+    if not primary then return end
+
+    local hasBase = false
+    local hasActiveOre = false
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("BasePart") then
+            local pName = string.lower(part.Name)
+            if pName == "rockbase" then hasBase = true end
+            if pName == "rockore" then hasActiveOre = true end
+        end
+    end
+
+    local statusText = "💎 ACTIVE ORE"
+    local highlightColor = Color3.fromRGB(0, 255, 128)
+    if hasBase and not hasActiveOre then
+        statusText = "❌ EMPTY ROCK"
+        highlightColor = Color3.fromRGB(255, 50, 50)
+    elseif not hasBase and not hasActiveOre then
+        statusText = "❓ UNKNOWN"
+        highlightColor = Color3.fromRGB(255, 150, 0)
+    end
+
+    local distStr = ""
+    if pPos then
+        local dist = (primary.Position - pPos).Magnitude
+        distStr = string.format("\n[%.1f Studs]", dist)
+        if dist <= 6.5 and hasActiveOre then
+            highlightColor = Color3.fromRGB(0, 170, 255)
+            statusText = "⚡ STAMP RANGE!"
+        end
+    end
+
+    -- Check if ESP objects already exist; if not, create them ONCE
+    if not activeESPObjects[model] then
+        local hl = Instance.new("Highlight")
+        hl.Adornee = model
+        hl.FillTransparency = 0.6
+        hl.OutlineTransparency = 0.2
+        hl.Parent = espFolder
+
+        local bg = Instance.new("BillboardGui")
+        bg.Adornee = primary
+        bg.Size = UDim2.new(0, 150, 0, 40)
+        bg.StudsOffset = Vector3.new(0, 5, 0)
+        bg.AlwaysOnTop = true
+
+        local txt = Instance.new("TextLabel")
+        txt.Size = UDim2.new(1, 0, 1, 0)
+        txt.BackgroundTransparency = 1
+        txt.TextStrokeTransparency = 0.2
+        txt.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Heavy)
+        txt.TextSize = 13
+        txt.Parent = bg
+        bg.Parent = espFolder
+
+        activeESPObjects[model] = { Highlight = hl, Billboard = bg, Label = txt }
+    end
+
+    -- Update existing ESP cleanly without re-instantiating
+    local esp = activeESPObjects[model]
+    esp.Highlight.FillColor = highlightColor
+    esp.Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    esp.Label.Text = statusText .. distStr
+    esp.Label.TextColor3 = highlightColor
+end
+
 task.spawn(function()
     while true do
         if Config.OreESPEnabled then
@@ -536,74 +605,7 @@ task.spawn(function()
             for _, model in ipairs(cachedESPModels) do
                 if model and model.Parent then
                     currentModelsMap[model] = true
-                    local primary = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
-                    if primary then
-                        local hasBase = false
-                        local hasActiveOre = false
-                        
-                        for _, part in ipairs(model:GetDescendants()) do
-                            if part:IsA("BasePart") then
-                                local pName = string.lower(part.Name)
-                                if pName == "rockbase" then hasBase = true end
-                                if pName == "rockore" then hasActiveOre = true end
-                            end
-                        end
-
-                        local statusText = "💎 ACTIVE ORE"
-                        local highlightColor = Color3.fromRGB(0, 255, 128)
-                        
-                        if hasBase and not hasActiveOre then
-                            statusText = "❌ EMPTY ROCK"
-                            highlightColor = Color3.fromRGB(255, 50, 50)
-                        elseif not hasBase and not hasActiveOre then
-                            statusText = "❓ UNKNOWN"
-                            highlightColor = Color3.fromRGB(255, 150, 0)
-                        end
-
-                        local distStr = ""
-                        if pPos then
-                            local dist = (primary.Position - pPos).Magnitude
-                            distStr = string.format("\n[%.1f Studs]", dist)
-                            if dist <= 6.5 and hasActiveOre then
-                                highlightColor = Color3.fromRGB(0, 170, 255)
-                                statusText = "⚡ STAMP RANGE!"
-                            end
-                        end
-
-                        -- Check if ESP objects already exist; if not, create them ONCE
-                        if not activeESPObjects[model] then
-                            local hl = Instance.new("Highlight")
-                            hl.Adornee = model
-                            hl.FillTransparency = 0.6
-                            hl.OutlineTransparency = 0.2
-                            hl.Parent = espFolder
-                            
-                            local bg = Instance.new("BillboardGui")
-                            bg.Adornee = primary
-                            bg.Size = UDim2.new(0, 150, 0, 40)
-                            bg.StudsOffset = Vector3.new(0, 5, 0)
-                            bg.AlwaysOnTop = true
-                            
-                            local txt = Instance.new("TextLabel")
-                            txt.Size = UDim2.new(1, 0, 1, 0)
-                            txt.BackgroundTransparency = 1
-                            txt.TextStrokeTransparency = 0.2
-                            txt.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Heavy)
-                            txt.TextSize = 13
-			    txt.AutoLocalize = false -- ANTI-CRASH FIX: Stops Roblox from frantically translating rapidly changing distance numbers
-                            txt.Parent = bg
-                            bg.Parent = espFolder
-
-                            activeESPObjects[model] = { Highlight = hl, Billboard = bg, Label = txt }
-                        end
-
-                        -- Update existing ESP cleanly without re-instantiating
-                        local esp = activeESPObjects[model]
-                        esp.Highlight.FillColor = highlightColor
-                        esp.Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                        esp.Label.Text = statusText .. distStr
-                        esp.Label.TextColor3 = highlightColor
-                    end
+                    renderESPForModel(model, pPos)
                 end
             end
 
@@ -622,7 +624,7 @@ task.spawn(function()
                 if esp.Highlight then esp.Highlight:Destroy() end
                 if esp.Billboard then esp.Billboard:Destroy() end
             end
-            table.clear(activeESPObjects)
+            for k in pairs(activeESPObjects) do activeESPObjects[k] = nil end
         end
         task.wait(0.2)
     end
@@ -2363,7 +2365,7 @@ do
                 conn:Disconnect()
             end
         end
-        table.clear(scriptConnections)
+        for k in pairs(scriptConnections) do scriptConnections[k] = nil end
 
         if visualizerFolder then visualizerFolder:Destroy() end
         _G.Autofarm_Control = nil
