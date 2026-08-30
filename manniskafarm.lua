@@ -2968,16 +2968,6 @@ local function findNearestRock(originPos, radius)
     return bestPart
 end
 
-local function rockHasOre(model)
-    if not model then return false end
-    for _, part in ipairs(model:GetDescendants()) do
-        if part:IsA("BasePart") and string.lower(part.Name) == "rockore" then
-            return true
-        end
-    end
-    return false
-end
-
 local function aimAt(targetPos)
     local cam = workspace.CurrentCamera
     if cam then cam.CFrame = CFrame.lookAt(cam.CFrame.Position, targetPos) end
@@ -2994,7 +2984,6 @@ local function executeMiningNode(data, root)
     local baseTarget = data.promptPos or data.pos
     local liveRock = findNearestRock(baseTarget, 30)
     local targetPosition = liveRock and liveRock.Position or baseTarget
-    local minedModel = liveRock and (liveRock:FindFirstAncestorOfClass("Model") or liveRock.Parent) or nil
     local camera = workspace.CurrentCamera
     local _, _, hum = getCharacter()
 
@@ -3036,9 +3025,21 @@ local function executeMiningNode(data, root)
         -- BLIND SPOT: Ignore all completion text for the first 2.0 seconds.
         -- This ensures fading red text from the PREVIOUS rock doesn't trigger an early exit.
         local textGracePeriod = tick() + 2.0 
-        -- REQUIRE persistent confirmation (2 scans) AND the ore actually gone before
-        -- declaring depletion. Prevents stale "No ore remaining!" from a prior rock.
+        -- REQUIRE persistent confirmation before declaring depletion.
+        -- Snapshot whether "No ore remaining!" text is ALREADY showing when we
+        -- arrive (stale from the PREVIOUS rock). Only count it as THIS rock
+        -- depleting if the text appears AFTER we started swinging.
         local depletedConfirmCount = 0
+        local depleteTextAtStart = false
+        for _, desc in ipairs(playerGui:GetDescendants()) do
+            if desc:IsA("TextLabel") and desc.Visible then
+                local t = string.lower(desc.Text)
+                if string.find(t, "no ore remaining") or string.find(t, "depleted") then
+                    depleteTextAtStart = true
+                    break
+                end
+            end
+        end
 
         -- Position lock: record where we started mining
         local miningStartPosition = targetPosition
@@ -3065,11 +3066,9 @@ local function executeMiningNode(data, root)
                 pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0) end)
             end
 
-            -- 2. Scan for "No ore remaining!" ONLY AFTER the grace period has passed.
-            --    Anti-stale: don't trust lingering text from the PREVIOUS rock.
-            --    Only confirm depletion when the text is present AND this rock's
-            --    mineable ore (rockore) is actually gone. A full/second deposit
-            --    still has ore, so stale "No ore remaining!" won't falsely trigger.
+            -- 2. Scan for "No ore remaining!". Only treat it as THIS rock depleting
+            --    if the text was NOT already showing when we arrived (i.e. not a
+            --    stale label left over from the PREVIOUS rock). Confirmed over 2 scans.
             if tick() > textGracePeriod then
                 local sawDepleteText = false
                 for _, desc in ipairs(playerGui:GetDescendants()) do
@@ -3082,7 +3081,7 @@ local function executeMiningNode(data, root)
                     end
                 end
 
-                if sawDepleteText and not rockHasOre(minedModel) then
+                if sawDepleteText and not depleteTextAtStart then
                     depletedConfirmCount = depletedConfirmCount + 1
                 else
                     depletedConfirmCount = 0
