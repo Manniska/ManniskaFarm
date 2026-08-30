@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V14.7 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V14.9 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -155,6 +155,8 @@ local Config = {
     SmartMiningEnabled = false,
     AutoLootGems = true,
     MiningFailsafeTimeout = 20,
+    OreESPEnabled = false,
+    AutoStampNodes = false,
     AutoSellEnabled = false,
     SellRouteFile = "SellRoute.json",
     ReturnRouteFile = "ReturnRoute.json",
@@ -322,7 +324,7 @@ local bootSub = Instance.new("TextLabel")
 bootSub.Size = UDim2.new(1, 0, 0, 16)
 bootSub.Position = UDim2.new(0, 0, 0, 52)
 bootSub.BackgroundTransparency = 1
-bootSub.Text = "V14.7 • INITIALIZING SUBSYSTEMS"
+bootSub.Text = "V14.9 • INITIALIZING SUBSYSTEMS"
 bootSub.TextColor3 = Color3.fromRGB(0, 170, 255)
 bootSub.TextSize = 11
 bootSub.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -480,6 +482,121 @@ setHaloTarget = function(pos)
     activeNodeHalo.CFrame = CFrame.new(pos) * CFrame.Angles(0, 0, math.rad(90))
     activeNodeHalo.Transparency = 0.3
 end
+
+-- =====================================================================
+-- ZERO-LAG SPATIAL ORE ESP (V5 Logic)
+-- =====================================================================
+local espFolder = workspace:FindFirstChild("ManniskaOreESP") or Instance.new("Folder")
+espFolder.Name = "ManniskaOreESP"
+espFolder.Parent = workspace
+
+local cachedESPModels = {}
+
+task.spawn(function()
+    while true do
+        if Config.OreESPEnabled then
+            local _, rootPart = getCharacter()
+            if rootPart then
+                local overlapParams = OverlapParams.new()
+                overlapParams.MaxParts = 5000
+                local nearbyParts = workspace:GetPartBoundsInRadius(rootPart.Position, 150, overlapParams)
+                
+                local newCache = {}
+                local seenModels = {}
+                for _, part in ipairs(nearbyParts) do
+                    local pName = string.lower(part.Name)
+                    if pName == "rockbase" or pName == "rockore" then
+                        local model = part:FindFirstAncestorOfClass("Model") or part.Parent
+                        if model and not seenModels[model] then
+                            seenModels[model] = true
+                            table.insert(newCache, model)
+                        end
+                    end
+                end
+                cachedESPModels = newCache
+            end
+        else
+            cachedESPModels = {}
+            espFolder:ClearAllChildren()
+        end
+        task.wait(1.0)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if Config.OreESPEnabled then
+            espFolder:ClearAllChildren()
+            local _, rootPart = getCharacter()
+            local pPos = rootPart and rootPart.Position or nil
+
+            for _, model in ipairs(cachedESPModels) do
+                if model and model.Parent then
+                    local primary = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+                    if primary then
+                        local hasBase = false
+                        local hasActiveOre = false
+                        
+                        for _, part in ipairs(model:GetDescendants()) do
+                            if part:IsA("BasePart") then
+                                local pName = string.lower(part.Name)
+                                if pName == "rockbase" then hasBase = true end
+                                if pName == "rockore" then hasActiveOre = true end
+                            end
+                        end
+
+                        local statusText = "💎 ACTIVE ORE"
+                        local highlightColor = Color3.fromRGB(0, 255, 128)
+                        
+                        if hasBase and not hasActiveOre then
+                            statusText = "❌ EMPTY ROCK"
+                            highlightColor = Color3.fromRGB(255, 50, 50)
+                        elseif not hasBase and not hasActiveOre then
+                            statusText = "❓ UNKNOWN"
+                            highlightColor = Color3.fromRGB(255, 150, 0)
+                        end
+
+                        local distStr = ""
+                        if pPos then
+                            local dist = (primary.Position - pPos).Magnitude
+                            distStr = string.format("\n[%.1f Studs]", dist)
+                            if dist <= 6.5 and hasActiveOre then
+                                highlightColor = Color3.fromRGB(0, 170, 255)
+                                statusText = "⚡ STAMP RANGE!"
+                            end
+                        end
+
+                        local hl = Instance.new("Highlight")
+                        hl.Adornee = model
+                        hl.FillColor = highlightColor
+                        hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                        hl.FillTransparency = 0.6
+                        hl.OutlineTransparency = 0.2
+                        hl.Parent = espFolder
+                        
+                        local bg = Instance.new("BillboardGui")
+                        bg.Adornee = primary
+                        bg.Size = UDim2.new(0, 150, 0, 40)
+                        bg.StudsOffset = Vector3.new(0, 5, 0)
+                        bg.AlwaysOnTop = true
+                        
+                        local txt = Instance.new("TextLabel")
+                        txt.Size = UDim2.new(1, 0, 1, 0)
+                        txt.BackgroundTransparency = 1
+                        txt.Text = statusText .. distStr
+                        txt.TextColor3 = highlightColor
+                        txt.TextStrokeTransparency = 0.2
+                        txt.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Heavy)
+                        txt.TextSize = 13
+                        txt.Parent = bg
+                        bg.Parent = espFolder
+                    end
+                end
+            end
+        end
+        task.wait(0.2)
+    end
+end)
 
 -- Scoped UI Construction (Fixes Register Limit 200)
 do
@@ -742,7 +859,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V14.7"
+    titleLabel.Text = "MANNISKAFARM V14.9"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -1584,11 +1701,21 @@ do
         Config.MiningFailsafeTimeout = math.floor(val)
     end, 4)
 
-    createSectionHeader(miningPage, "Auto-Sell & Inventory", 5)
+    createSectionHeader(miningPage, "ESP & Auto-Detection", 5)
+
+    createToggleRow(miningPage, "OreESPToggle", "Enable Ore ESP (Zero-Lag Spatial)", Color3.fromRGB(255, 150, 0), function(state)
+        Config.OreESPEnabled = state
+    end, 6, Config.OreESPEnabled)
+
+    createToggleRow(miningPage, "AutoStampToggle", "Auto-Stamp Mine Nodes (Walk-By)", Color3.fromRGB(0, 170, 255), function(state)
+        Config.AutoStampNodes = state
+    end, 7, Config.AutoStampNodes)
+
+    createSectionHeader(miningPage, "Auto-Sell & Inventory", 8)
 
     createToggleRow(miningPage, "AutoSellToggle", "Auto-Sell on Backpack Full", Color3.fromRGB(255, 170, 0), function(state)
         Config.AutoSellEnabled = state
-    end, 6, Config.AutoSellEnabled)
+    end, 9, Config.AutoSellEnabled)
 
     local function createRouteInputRow(parent, name, placeholder, defaultText, order, onChange)
         local row = Instance.new("Frame")
@@ -1624,11 +1751,11 @@ do
         return row
     end
 
-    createRouteInputRow(miningPage, "SellRouteInput", "Sell Route Filename (.json)", Config.SellRouteFile, 7, function(val)
+    createRouteInputRow(miningPage, "SellRouteInput", "Sell Route Filename (.json)", Config.SellRouteFile, 10, function(val)
         Config.SellRouteFile = val
     end)
 
-    createRouteInputRow(miningPage, "ReturnRouteInput", "Return Route Filename (.json)", Config.ReturnRouteFile, 8, function(val)
+    createRouteInputRow(miningPage, "ReturnRouteInput", "Return Route Filename (.json)", Config.ReturnRouteFile, 11, function(val)
         Config.ReturnRouteFile = val
     end)
 
@@ -1666,7 +1793,7 @@ do
         return row
     end
 
-    createTextInputRow(miningPage, "InvFullInput", "Custom Inventory Full Alert Text", Config.InventoryFullText, 9, function(val)
+    createTextInputRow(miningPage, "InvFullInput", "Custom Inventory Full Alert Text", Config.InventoryFullText, 12, function(val)
         Config.InventoryFullText = val
     end)
 
@@ -2621,35 +2748,92 @@ startRecording = function()
     task.spawn(function()
         local lastRecordedPos = initialPos
         local standingStillTime = 0
+        local dynamicallyStampedOres = {} -- Prevents double-stamping
 
         while isRecording do
             local pos = getEntityPosition()
             if pos then
                 local _, _, h = getCharacter()
-                local distMoved = (pos - lastRecordedPos).Magnitude
                 local now = tick()
-                local stampedJump = jumpTriggered
-                jumpTriggered = false
+                local detectedOre = false
 
-                if distMoved > 0.4 or stampedJump then
-                    standingStillTime = 0
-                    table.insert(Waypoints, {
-                        pos = pos,
-                        jump = stampedJump,
-                        pauseDuration = 0,
-                        speed = h and h.WalkSpeed or 16,
-                        isSprinting = h and (h.WalkSpeed > 17) or false,
-                        action = nil,
-                        delay = now - lastWaypointTime
-                    })
-                    lastRecordedPos = pos
-                    lastWaypointTime = now
-                    updateTelemetry(nil, #Waypoints)
-                    if Config.RealtimeVisualizer then renderVisualPath(Waypoints) end
-                else
-                    standingStillTime = standingStillTime + 0.08
-                    if #Waypoints > 0 and standingStillTime > 0.6 then
-                        Waypoints[#Waypoints].pauseDuration = math.floor(standingStillTime * 10) / 10
+                -- =========================================================
+                -- DYNAMIC AUTO-DETECT: Walk-by Mine Node Stamping (6.5 Studs)
+                -- =========================================================
+                if Config.AutoStampNodes then
+                    local overlapParams = OverlapParams.new()
+                    overlapParams.MaxParts = 200
+                    -- Scan a small 10-stud bubble right around character
+                    local nearbyParts = workspace:GetPartBoundsInRadius(pos, 10, overlapParams)
+                    
+                    for _, part in ipairs(nearbyParts) do
+                        local pName = string.lower(part.Name)
+                        if pName == "rockore" then -- Specifically look for ACTIVE ore
+                            local model = part:FindFirstAncestorOfClass("Model") or part.Parent
+                            if model then
+                                local primary = model.PrimaryPart or part
+                                local dist = (primary.Position - pos).Magnitude
+                                
+                                -- 6.5 studs ensures we physically bumped the rock
+                                if dist <= 6.5 and not dynamicallyStampedOres[model] then
+                                    dynamicallyStampedOres[model] = true
+                                    detectedOre = true
+                                    
+                                    -- Stamp the node right where we stand, aim at the rock
+                                    table.insert(Waypoints, {
+                                        pos = pos,
+                                        promptPos = primary.Position,
+                                        isMineNode = true,
+                                        jump = false,
+                                        pauseDuration = 0,
+                                        speed = h and h.WalkSpeed or 16,
+                                        isSprinting = h and (h.WalkSpeed > 17) or false,
+                                        actionHoldDuration = 8.5,
+                                        exhaustionCount = 1,
+                                        delay = now - lastWaypointTime
+                                    })
+                                    lastRecordedPos = pos
+                                    lastWaypointTime = now
+                                    updateTelemetry(nil, #Waypoints)
+                                    if Config.RealtimeVisualizer then renderVisualPath(Waypoints) end
+                                    
+                                    showToast(string.format("⚡ Auto-Detected Ore! Node #%d Stamped.", #Waypoints))
+                                    playSoundFeedback(1.5) -- High pitch beep confirmation
+                                    break -- Stop scanning parts once one is stamped this tick
+                                end
+                            end
+                        end
+                    end
+                end
+
+                -- =========================================================
+                -- NORMAL KINEMATIC TRACKING
+                -- =========================================================
+                if not detectedOre then
+                    local distMoved = (pos - lastRecordedPos).Magnitude
+                    local stampedJump = jumpTriggered
+                    jumpTriggered = false
+
+                    if distMoved > 0.4 or stampedJump then
+                        standingStillTime = 0
+                        table.insert(Waypoints, {
+                            pos = pos,
+                            jump = stampedJump,
+                            pauseDuration = 0,
+                            speed = h and h.WalkSpeed or 16,
+                            isSprinting = h and (h.WalkSpeed > 17) or false,
+                            action = nil,
+                            delay = now - lastWaypointTime
+                        })
+                        lastRecordedPos = pos
+                        lastWaypointTime = now
+                        updateTelemetry(nil, #Waypoints)
+                        if Config.RealtimeVisualizer then renderVisualPath(Waypoints) end
+                    else
+                        standingStillTime = standingStillTime + 0.08
+                        if #Waypoints > 0 and standingStillTime > 0.6 then
+                            Waypoints[#Waypoints].pauseDuration = math.floor(standingStillTime * 10) / 10
+                        end
                     end
                 end
             end
@@ -2708,7 +2892,7 @@ task.spawn(function()
 end)
 
 -- =====================================================================
--- HYBRID MINING ENGINE (FAST RANDOMIZED SWING + LINGER-PROOF TEXT CHECK)
+-- HYBRID MINING ENGINE (LEGAL HUMAN SWING + BLINDSPOT TEXT CHECK)
 -- =====================================================================
 local function executeMiningNode(data, root)
     local targetPosition = data.promptPos or data.pos
@@ -2730,70 +2914,67 @@ local function executeMiningNode(data, root)
             VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Four, false, game)
         end)
     end
-    task.wait(0.6) -- Shortened draw animation wait
+    task.wait(0.8)
 
     local manualTimer = data.actionHoldDuration or 15.0
 
     if Config.SmartMiningEnabled then
         local timeOut = tick() + Config.MiningFailsafeTimeout
         
-        -- Track depletion text from the previous rock so fading ghost text doesn't trigger early exit
-        local lastDepletionTime = nil
-        local depletionCooldown = 0.5 -- seconds of stable depletion text before we accept it
+        -- BLIND SPOT: Ignore all completion text for the first 2.0 seconds.
+        -- This ensures fading red text from the PREVIOUS rock doesn't trigger an early exit.
+        local textGracePeriod = tick() + 2.0 
 
         -- Position lock: record where we started mining
         local miningStartPosition = targetPosition
-        local maxDriftDistance = 8.0 -- max studs we'll drift before forcing a reposition
+        local maxDriftDistance = 8.0
 
         while isPlaying and tick() < timeOut do
-            -- Position check: if we've drifted too far from the mining target, snap back
-            local _, curRoot, curHum = getCharacter()
+            -- Anti-Drift: snap back if pushed by collision
+            local _, curRoot, _ = getCharacter()
             if curRoot then
                 local drift = (curRoot.Position - miningStartPosition).Magnitude
                 if drift > maxDriftDistance then
-                    showToast("⛏️ Drifted too far, repositioning...")
                     curRoot.AssemblyLinearVelocity = Vector3.zero
                     curRoot.CFrame = CFrame.lookAt(curRoot.Position, Vector3.new(targetPosition.X, curRoot.Position.Y, targetPosition.Z))
-                    task.wait(0.2)
+                    task.wait(0.1)
                 end
             end
 
-            -- 1. Fast Humanized Swing (Bypasses the 600s Anti-Cheat Cooldown)
+            -- 1. Legal Humanized Swing
+            -- We click once per loop instead of spamming.
             if VirtualInputManager then
                 pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0) end)
-                task.wait(0.05) -- Fast, crisp click down/up
+                task.wait(0.1) -- Natural click depression time
                 pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0) end)
             end
 
-            -- 2. Scan for "No ore remaining!" with cooldown stabilization
-            local isDepleted = false
-            for _, desc in ipairs(playerGui:GetDescendants()) do
-                if desc:IsA("TextLabel") and desc.Visible then
-                    local text = string.lower(desc.Text)
-                    if string.find(text, "no ore remaining") or string.find(text, "depleted") then
-                        isDepleted = true
-                        break
+            -- 2. Scan for "No ore remaining!" ONLY AFTER the grace period has passed
+            if tick() > textGracePeriod then
+                local isDepleted = false
+                for _, desc in ipairs(playerGui:GetDescendants()) do
+                    if desc:IsA("TextLabel") and desc.Visible then
+                        local text = string.lower(desc.Text)
+                        if string.find(text, "no ore remaining") or string.find(text, "depleted") then
+                            isDepleted = true
+                            break
+                        end
                     end
                 end
-            end
 
-            if isDepleted then
-                if lastDepletionTime == nil then
-                    lastDepletionTime = tick()
-                elseif (tick() - lastDepletionTime) >= depletionCooldown then
+                if isDepleted then
                     showToast("⛏️ Rock completely depleted!")
                     break
                 end
-            else
-                lastDepletionTime = nil -- reset cooldown if text disappears
             end
 
-            -- Dynamic swing delay (0.30s - 0.45s) prevents static macro flagging while keeping speed fast
-            local randomSwingCooldown = 0.30 + (math.random(0, 15) / 100)
-            task.wait(randomSwingCooldown)
+            -- ANTI-CHEAT FIX: 0.85s to 1.15s cooldown strictly obeys TWW's internal pickaxe speeds.
+            -- This prevents the "mining too fast (600s)" flag completely.
+            local legalSwingCooldown = 0.85 + (math.random(0, 30) / 100)
+            task.wait(legalSwingCooldown)
         end
     else
-        -- MANUAL BRANCH: Blind Swing Timer with Fast Humanized Rhythm
+        -- MANUAL BRANCH: Blind Swing Timer with Legal Rhythm
         showToast(string.format("Blind Mining: %.1fs", manualTimer))
         local swingStart = tick()
         while isPlaying and (tick() - swingStart) < manualTimer do
@@ -2803,12 +2984,12 @@ local function executeMiningNode(data, root)
             
             if VirtualInputManager then
                 pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0) end)
-                task.wait(0.05)
+                task.wait(0.1)
                 pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0) end)
             end
             
-            local randomSwingCooldown = 0.30 + (math.random(0, 15) / 100)
-            task.wait(randomSwingCooldown)
+            local legalSwingCooldown = 0.85 + (math.random(0, 30) / 100)
+            task.wait(legalSwingCooldown)
         end
     end
 
@@ -3695,4 +3876,4 @@ for _, item in ipairs(mainFrame:GetDescendants()) do
 end
 mainFrame.BackgroundTransparency = 0.15
 
-print("🚀 Autofarm V14.7 (Smart Mine + Auto-Sell) Loaded.")
+print("🚀 Autofarm V14.9 (Smart Mine + Auto-Sell) Loaded.")
