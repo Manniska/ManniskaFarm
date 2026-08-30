@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V15.2 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V15.3 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -325,7 +325,7 @@ local bootSub = Instance.new("TextLabel")
 bootSub.Size = UDim2.new(1, 0, 0, 16)
 bootSub.Position = UDim2.new(0, 0, 0, 52)
 bootSub.BackgroundTransparency = 1
-bootSub.Text = "V15.2 • INITIALIZING SUBSYSTEMS"
+    bootSub.Text = "V15.3 • INITIALIZING SUBSYSTEMS"
 bootSub.TextColor3 = Color3.fromRGB(0, 170, 255)
 bootSub.TextSize = 11
 bootSub.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -895,7 +895,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V15.2"
+    titleLabel.Text = "MANNISKAFARM V15.3"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -3058,26 +3058,49 @@ local function executeMiningNode(data, root)
         local maxDriftDistance = 8.0
 
         local aimConn = game:GetService("RunService").RenderStepped:Connect(function()
-            if isPlaying and targetPosition then
-                local cam2 = workspace.CurrentCamera
-                -- Micro-jitter to mask the bot's static camera angle
-                local jitterX = (math.random(-2, 2) / 1000)
-                local jitterY = (math.random(-2, 2) / 1000)
-                local jitterZ = (math.random(-2, 2) / 1000)
-                local hTarget = targetPosition + Vector3.new(jitterX, jitterY, jitterZ)
-                if cam2 then cam2.CFrame = CFrame.lookAt(cam2.CFrame.Position, hTarget) end
+            if isPlaying and camera then
+                -- Cheap camera hold: keep the camera pointed at the deposit. Only
+                -- re-aim when it's actually off-target (the old per-frame math.random
+                -- + 3 Vector3 allocations were hammering the render thread -> FPS drop).
+                if camera.CFrame.LookVector:Dot(targetPosition - camera.Position) < 0.999 then
+                    camera.CFrame = CFrame.lookAt(camera.CFrame.Position, targetPosition)
+                end
             end
         end)
 
-        -- 🔴 HOLD-TO-MINE PHASE: Press Mouse 1 DOWN and hold it 
+        -- 🔴 HOLD-TO-MINE PHASE: Press Mouse 1 DOWN and hold it (matches how real
+        -- players mine in Wild West -- the game controls pickaxe swing cadence).
         if VirtualInputManager then
             pcall(function() VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, true, game, 0) end)
         end
 
+        -- Keep the CHARACTER'S BODY facing the deposit the whole time, not just the
+        -- camera. The game's swing animation rotates the body away over time; if we
+        -- don't re-face it, pickaxe raycasts hit air (missing = the 600s "mining too
+        -- fast" flag). We set the root CFrame directly (cheap) instead of the heavy
+        -- PlatformStand toggle that aimAt does -- toggling that every frame tanks FPS
+        -- and cancels the swing.
+        local lastScan = 0
+
         while isPlaying and tick() < timeOut do
+            -- Face the body toward the deposit. Using the root CFrame rotation only --
+            -- but NOT every single frame (that fights the swing animation). Once per
+            -- loop tick (~7x/sec) is enough to keep hits on target.
+            local _, curR = getCharacter()
+            if curR and targetPosition then
+                curR.CFrame = CFrame.lookAt(curR.Position, Vector3.new(targetPosition.X, curR.Position.Y, targetPosition.Z))
+            end
+
+            -- The expensive UI text scan is throttled to every 0.3s; scanning every
+            -- 50ms server-crawls the whole PlayerGui and is the main reason FPS drops.
+            if tick() - lastScan < 0.3 then
+                task.wait(0.05)
+                continue
+            end
+            lastScan = tick()
             local sawDepleteText = false
             local sawTierText = false
-            
+
             -- Scan game UI for updates (ignores macro UI)
             for _, desc in ipairs(playerGui:GetDescendants()) do
                 if screenGui and desc:IsDescendantOf(screenGui) then continue end
@@ -3106,16 +3129,15 @@ local function executeMiningNode(data, root)
             end
 
             -- Anti-Drift Check
-            local _, curRoot, _ = getCharacter()
-            if curRoot then
-                local drift = (curRoot.Position - miningStartPosition).Magnitude
+            if curR then
+                local drift = (curR.Position - miningStartPosition).Magnitude
                 if drift > maxDriftDistance then
-                    curRoot.AssemblyLinearVelocity = Vector3.zero
+                    curR.AssemblyLinearVelocity = Vector3.zero
                     aimAt(targetPosition)
                 end
             end
 
-            task.wait(0.05) -- Fast check loop while the game natively swings the pickaxe
+            task.wait(0.05) -- check loop while the game natively swings the pickaxe
         end
 
         -- release phase: Let go of Mouse 1
@@ -3134,7 +3156,12 @@ local function executeMiningNode(data, root)
         end
         
         while isPlaying and (tick() - swingStart) < manualTimer do
-            aimAt(targetPosition)
+            -- Cheap body-face (no PlatformStand toggle per frame): keeps the swing
+            -- aimed at the deposit so hits connect instead of hitting air.
+            local _, bR, _ = getCharacter()
+            if bR and targetPosition then
+                bR.CFrame = CFrame.lookAt(bR.Position, Vector3.new(targetPosition.X, bR.Position.Y, targetPosition.Z))
+            end
             task.wait(0.05)
         end
         
@@ -4088,5 +4115,5 @@ for _, item in ipairs(mainFrame:GetDescendants()) do
 end
 mainFrame.BackgroundTransparency = 0.15
 
-print("🚀 Autofarm V15.2 (Smart Mine + Auto-Sell) Loaded.")
+print("🚀 Autofarm V15.3 (Smart Mine + Auto-Sell) Loaded.")
     end
