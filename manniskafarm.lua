@@ -2953,19 +2953,33 @@ local function findNearestRock(originPos, radius)
     local nearbyParts = workspace:GetPartBoundsInRadius(originPos, radius or 30, overlapParams)
     local bestPart = nil
     local bestDist = (radius or 30) + 1
+    -- Fallback: if we find no *named* ore rock, remember any solid part that is
+    -- within range so we still have something to aim at (better than a stale pos).
+    local fallbackPart = nil
+    local fallbackDist = (radius or 30) + 1
     for _, part in ipairs(nearbyParts) do
-        if part:IsA("BasePart") then
+        if part:IsA("BasePart") and part.Transparency < 1 then
             local pName = string.lower(part.Name)
-            if pName == "rockbase" or pName == "rockore" then
-                local dist = (part.Position - originPos).Magnitude
+            local dist = (part.Position - originPos).Magnitude
+            -- TWW ore nodes are usually named with "rock" in them (RockBase, RockOre,
+            -- etc.). Match on the substring so different naming variants are caught.
+            if string.find(pName, "rock") then
                 if dist < bestDist then
                     bestDist = dist
                     bestPart = part
                 end
+            else
+                -- Solid, unmoving part in range: use as a fallback target so the
+                -- character still has something to face/mine (minimises air-hits from
+                -- stale recorded positions).
+                if dist < fallbackDist then
+                    fallbackDist = dist
+                    fallbackPart = part
+                end
             end
         end
     end
-    return bestPart
+    return bestPart or fallbackPart
 end
 
 local function aimAt(targetPos)
@@ -3074,21 +3088,36 @@ local function executeMiningNode(data, root)
             pcall(function() VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, true, game, 0) end)
         end
 
-        -- Keep the CHARACTER'S BODY facing the deposit the whole time, not just the
-        -- camera. The game's swing animation rotates the body away over time; if we
-        -- don't re-face it, pickaxe raycasts hit air (missing = the 600s "mining too
-        -- fast" flag). We set the root CFrame directly (cheap) instead of the heavy
-        -- PlatformStand toggle that aimAt does -- toggling that every frame tanks FPS
-        -- and cancels the swing.
+        -- The camera (RenderStepped above) keeps the view on the deposit so the
+        -- hold-to-mine hit-test hits the rock. We keep the CHARACTER facing it too,
+        -- but do NOT hard-write root.CFrame every tick -- writing it constantly while
+        -- the swing animation runs causes the shaking and cancels the swing. Instead
+        -- we re-aim the body only occasionally via aimAt (its PlatformStand trick
+        -- makes the rotation stick without fighting the animation).
         local lastScan = 0
+        local lastBodyAim = 0
+        local lastRockRescan = 0
 
         while isPlaying and tick() < timeOut do
-            -- Face the body toward the deposit. Using the root CFrame rotation only --
-            -- but NOT every single frame (that fights the swing animation). Once per
-            -- loop tick (~7x/sec) is enough to keep hits on target.
-            local _, curR = getCharacter()
-            if curR and targetPosition then
-                curR.CFrame = CFrame.lookAt(curR.Position, Vector3.new(targetPosition.X, curR.Position.Y, targetPosition.Z))
+            -- DYNAMIC RE-ACQUIRE: refreshes the live rock position every ~2s so we
+            -- keep aiming at the CURRENT ore node (nodes can be depleted/replaced,
+            -- and our original scan may have missed). Without this, a stale
+            -- targetPosition makes the swing hit air for the whole failsafe.
+            if tick() - lastRockRescan > 2.0 then
+                lastRockRescan = tick()
+                local freshRock = findNearestRock(baseTarget, 30)
+                if freshRock then
+                    targetPosition = freshRock.Position
+                end
+            end
+
+            -- Re-face the body to the deposit every 0.5s (not every tick), so the
+            -- swing animation isn't interrupted and the character doesn't shake. Uses
+            -- aimAt's PlatformStand rotation so the facing holds even with the
+            -- pickaxe tool equipped.
+            if targetPosition and tick() - lastBodyAim > 0.5 then
+                lastBodyAim = tick()
+                aimAt(targetPosition)
             end
 
             -- The expensive UI text scan is throttled to every 0.3s; scanning every
@@ -3129,10 +3158,11 @@ local function executeMiningNode(data, root)
             end
 
             -- Anti-Drift Check
-            if curR then
-                local drift = (curR.Position - miningStartPosition).Magnitude
+            local _, driftR = getCharacter()
+            if driftR then
+                local drift = (driftR.Position - miningStartPosition).Magnitude
                 if drift > maxDriftDistance then
-                    curR.AssemblyLinearVelocity = Vector3.zero
+                    driftR.AssemblyLinearVelocity = Vector3.zero
                     aimAt(targetPosition)
                 end
             end
@@ -3156,13 +3186,11 @@ local function executeMiningNode(data, root)
         end
         
         while isPlaying and (tick() - swingStart) < manualTimer do
-            -- Cheap body-face (no PlatformStand toggle per frame): keeps the swing
-            -- aimed at the deposit so hits connect instead of hitting air.
-            local _, bR, _ = getCharacter()
-            if bR and targetPosition then
-                bR.CFrame = CFrame.lookAt(bR.Position, Vector3.new(targetPosition.X, bR.Position.Y, targetPosition.Z))
-            end
-            task.wait(0.05)
+            -- Re-face the body occasionally via aimAt (PlatformStand rotation holds
+            -- even with the tool equipped) WITHOUT hard-writing root.CFrame every
+            -- tick, which caused shaking and cancelled the swing.
+            if targetPosition then aimAt(targetPosition) end
+            task.wait(0.4)
         end
         
         -- release phase: Let go of Mouse 1
