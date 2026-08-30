@@ -1,5 +1,5 @@
 -- =====================================================================
---  MANNISKAFARM V15.0 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
+--  MANNISKAFARM V15.1 - HARDWARE BRIDGE & KINEMATIC FARMING SUITE
 -- =====================================================================
 
 local TweenService = game:GetService("TweenService")
@@ -286,6 +286,7 @@ screenGui.Name = "ManniskaFarmUI"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.IgnoreGuiInset = true
+screenGui.AutoLocalize = false -- MISSING ANTI-CRASH: Globally disables translation for all telemetry and menus
 screenGui.Parent = playerGui
 
 -- =====================================================================
@@ -324,7 +325,7 @@ local bootSub = Instance.new("TextLabel")
 bootSub.Size = UDim2.new(1, 0, 0, 16)
 bootSub.Position = UDim2.new(0, 0, 0, 52)
 bootSub.BackgroundTransparency = 1
-bootSub.Text = "V15.0 • INITIALIZING SUBSYSTEMS"
+bootSub.Text = "V15.1 • INITIALIZING SUBSYSTEMS"
 bootSub.TextColor3 = Color3.fromRGB(0, 170, 255)
 bootSub.TextSize = 11
 bootSub.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -455,11 +456,12 @@ local function getVisLabel(idx)
     billboard.Size = UDim2.new(0, 48, 0, 18)
     billboard.StudsOffset = Vector3.new(0, 1.2, 0)
     billboard.AlwaysOnTop = true
-    billboard.Parent = visualizerFolder
+    billboard.Parent = screenGui -- MISSING ANTI-CRASH: Parent out of Workspace and into the protected UI
     local tag = Instance.new("TextLabel")
     tag.Size = UDim2.new(1, 0, 1, 0)
     tag.BackgroundTransparency = 1
     tag.TextSize = 10
+    tag.AutoLocalize = false -- MISSING ANTI-CRASH: Stop translating 3D labels
     tag.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
     tag.Parent = billboard
     local lblObj = { Billboard = billboard, Tag = tag, Attach = attach }
@@ -580,8 +582,10 @@ local function renderESPForModel(model, pPos)
         txt.TextStrokeTransparency = 0.2
         txt.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Heavy)
         txt.TextSize = 13
+        txt.AutoLocalize = false -- ANTI-CRASH FIX
         txt.Parent = bg
-        bg.Parent = espFolder
+
+        bg.Parent = screenGui -- ANTI-CRASH FIX: Parent to local UI, not workspace
 
         activeESPObjects[model] = { Highlight = hl, Billboard = bg, Label = txt }
     end
@@ -891,7 +895,7 @@ do
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0, 145, 1, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "MANNISKAFARM V15.0"
+    titleLabel.Text = "MANNISKAFARM V15.1"
     titleLabel.TextColor3 = activeTheme.TextPrimary
     titleLabel.TextSize = 13
     titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -1034,6 +1038,7 @@ do
     end)
 
     -- Telemetry Bar
+    do
     local progressTrack = Instance.new("Frame")
     progressTrack.Name = "ProgressTrack"
     progressTrack.Size = UDim2.new(1, 0, 0, 2)
@@ -1051,7 +1056,9 @@ do
     progressBar.Parent = progressTrack
     registerElement("AccentBg", progressBar, "BackgroundColor3")
 
+    end
     -- Toast Notifications
+    do
     local toastFrame = Instance.new("Frame")
     toastFrame.Name = "Toast"
     toastFrame.Size = UDim2.new(1, -28, 0, 32)
@@ -1100,6 +1107,7 @@ do
         end)
     end
 
+    end
     -- Tab Framework
     local tabContainer = Instance.new("Frame")
     tabContainer.Name = "Tabs"
@@ -1490,6 +1498,7 @@ do
     end
 
     -- Telemetry Card
+    do
     telemetryCard = Instance.new("Frame")
     telemetryCard.Name = "TelemetryCard"
     telemetryCard.LayoutOrder = 1
@@ -1540,7 +1549,9 @@ do
     routeModeLabel.Parent = telemetryCard
     registerElement("AccentText", routeModeLabel, "TextColor3")
 
+    end
     -- Controls Page Components
+    do
     recordToggleControl = createToggleRow(controlsPage, "RecordToggle", "Record Route Path", activeTheme.RecordActive, function(state)
         if state then startRecording() else stopRecording() end
     end, 2)
@@ -1718,7 +1729,9 @@ do
         end
     end, 9, false)
 
+    end
     -- --- MINING PAGE ---
+    do
     createSectionHeader(miningPage, "Smart Mining System", 1)
 
     createToggleRow(miningPage, "SmartMiningToggle", "Enable Smart Mining (Damage Bar)", activeTheme.Accent, function(state)
@@ -1829,7 +1842,9 @@ do
         Config.InventoryFullText = val
     end)
 
+    end
     -- --- SETTINGS PAGE ---
+    do
     createSectionHeader(settingsPage, "Playback & Scaling", 1)
 
     local modeRow = Instance.new("Frame")
@@ -2217,7 +2232,9 @@ do
         end)
     end
 
+    end
     -- --- ADVANCED TAB ---
+    do
     createSectionHeader(advancedPage, "Humanization & Randomization", 1)
 
     createToggleRow(advancedPage, "MicroRandToggle", "Micro Randomization (Human Timing & Path)", activeTheme.Accent, function(state)
@@ -2266,7 +2283,9 @@ do
         end
     end, 13, Config.AutoRejoin)
 
+    end
     -- --- SAFETY TAB ---
+    do
     createSectionHeader(safetyPage, "Player Proximity Radar", 1)
 
     createToggleRow(safetyPage, "RadarToggle", "Enable Player Radar", Color3.fromRGB(240, 70, 70), function(state)
@@ -2409,7 +2428,9 @@ do
         terminateProcess()
     end)
 
+    end
     -- Window Resize Handle
+    do
     local resizeHandle = Instance.new("TextButton")
     resizeHandle.Name = "ResizeHandle"
     resizeHandle.Size = UDim2.new(0, 18, 0, 18)
@@ -3908,4 +3929,5 @@ for _, item in ipairs(mainFrame:GetDescendants()) do
 end
 mainFrame.BackgroundTransparency = 0.15
 
-print("🚀 Autofarm V15.0 (Smart Mine + Auto-Sell) Loaded.")
+print("🚀 Autofarm V15.1 (Smart Mine + Auto-Sell) Loaded.")
+    end
