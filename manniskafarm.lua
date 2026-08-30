@@ -3035,13 +3035,17 @@ local function executeMiningNode(data, root)
         local timeOut = tick() + failsafe
         local textGracePeriod = tick() + 2.0 
         local depleteTextAtStart = false
+        local tierTextAtStart = false
         
+        -- Pre-Scan: Check if any text is lingering BEFORE we swing
         for _, desc in ipairs(playerGui:GetDescendants()) do
+            if screenGui and desc:IsDescendantOf(screenGui) then continue end
             if desc:IsA("TextLabel") and desc.Visible then
                 local t = string.lower(desc.Text)
                 if string.find(t, "no ore remaining") or string.find(t, "depleted") then
                     depleteTextAtStart = true
-                    break
+                elseif string.find(t, "need at least a tier") or string.find(t, "to mine this ore") then
+                    tierTextAtStart = true
                 end
             end
         end
@@ -3061,25 +3065,36 @@ local function executeMiningNode(data, root)
             end
         end)
 
-        -- hold-to-mine phase: Press Mouse 1 DOWN and hold it 
+        -- 🔴 HOLD-TO-MINE PHASE: Press Mouse 1 DOWN and hold it 
         if VirtualInputManager then
             pcall(function() VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, true, game, 0) end)
         end
 
         while isPlaying and tick() < timeOut do
-            -- Look for completion text
-            if tick() > textGracePeriod then
-                local sawDepleteText = false
-                for _, desc in ipairs(playerGui:GetDescendants()) do
-                    if desc:IsA("TextLabel") and desc.Visible then
-                        local text = string.lower(desc.Text)
-                        if string.find(text, "no ore remaining") or string.find(text, "depleted") then
-                            sawDepleteText = true
-                            break
-                        end
+            local sawDepleteText = false
+            local sawTierText = false
+            
+            -- Scan game UI for updates (ignores macro UI)
+            for _, desc in ipairs(playerGui:GetDescendants()) do
+                if screenGui and desc:IsDescendantOf(screenGui) then continue end
+                if desc:IsA("TextLabel") and desc.Visible then
+                    local text = string.lower(desc.Text)
+                    if string.find(text, "no ore remaining") or string.find(text, "depleted") then
+                        sawDepleteText = true
+                    elseif string.find(text, "need at least a tier") or string.find(text, "to mine this ore") then
+                        sawTierText = true
                     end
                 end
+            end
 
+            -- INSTANT BAIL: Pickaxe Tier is too low for this rock
+            if sawTierText and tick() > textGracePeriod and not tierTextAtStart then
+                showToast("⚠️ Pickaxe Tier Too Low! Skipping rock.")
+                break
+            end
+
+            -- GRACE PERIOD BAIL: Rock is depleted
+            if tick() > textGracePeriod then
                 if sawDepleteText and not depleteTextAtStart then
                     showToast("⛏️ Rock completely depleted!")
                     break
