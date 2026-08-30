@@ -3029,7 +3029,6 @@ local function executeMiningNode(data, root)
         -- Snapshot whether "No ore remaining!" text is ALREADY showing when we
         -- arrive (stale from the PREVIOUS rock). Only count it as THIS rock
         -- depleting if the text appears AFTER we started swinging.
-        local depletedConfirmCount = 0
         local depleteTextAtStart = false
         for _, desc in ipairs(playerGui:GetDescendants()) do
             if desc:IsA("TextLabel") and desc.Visible then
@@ -3046,29 +3045,10 @@ local function executeMiningNode(data, root)
         local maxDriftDistance = 8.0
 
         while isPlaying and tick() < timeOut do
-            -- Anti-Drift: snap back if pushed by collision
-            local _, curRoot, _ = getCharacter()
-            if curRoot then
-                local drift = (curRoot.Position - miningStartPosition).Magnitude
-                if drift > maxDriftDistance then
-                    curRoot.AssemblyLinearVelocity = Vector3.zero
-                    aimAt(targetPosition)
-                    task.wait(0.1)
-                end
-            end
-
-            -- 1. Legal Humanized Swing
-            -- We click once per loop instead of spamming.
-            aimAt(targetPosition) -- Re-aim each swing so screen-center clicks hit the rock
-            if VirtualInputManager then
-                pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0) end)
-                task.wait(0.1) -- Natural click depression time
-                pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0) end)
-            end
-
-            -- 2. Scan for "No ore remaining!". Only treat it as THIS rock depleting
-            --    if the text was NOT already showing when we arrived (i.e. not a
-            --    stale label left over from the PREVIOUS rock). Confirmed over 2 scans.
+            -- 0. DEPLETED CHECK (BEFORE each swing): if THIS rock ran out, stop now
+            --    so we don't swing at an empty rock (which triggers the "mining
+            --    too fast 600s" anti-cheat). Only treat it as depleting if the text
+            --    was NOT already showing when we arrived (stale from PREVIOUS rock).
             if tick() > textGracePeriod then
                 local sawDepleteText = false
                 for _, desc in ipairs(playerGui:GetDescendants()) do
@@ -3082,15 +3062,29 @@ local function executeMiningNode(data, root)
                 end
 
                 if sawDepleteText and not depleteTextAtStart then
-                    depletedConfirmCount = depletedConfirmCount + 1
-                else
-                    depletedConfirmCount = 0
-                end
-
-                if depletedConfirmCount >= 2 then
                     showToast("⛏️ Rock completely depleted!")
                     break
                 end
+            end
+
+            -- Anti-Drift: snap back if pushed by collision
+            local _, curRoot, _ = getCharacter()
+            if curRoot then
+                local drift = (curRoot.Position - miningStartPosition).Magnitude
+                if drift > maxDriftDistance then
+                    curRoot.AssemblyLinearVelocity = Vector3.zero
+                    aimAt(targetPosition)
+                    task.wait(0.1)
+                end
+            end
+
+            -- Legal Humanized Swing
+            -- We click once per loop instead of spamming.
+            aimAt(targetPosition) -- Re-aim each swing so screen-center clicks hit the rock
+            if VirtualInputManager then
+                pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0) end)
+                task.wait(0.1) -- Natural click depression time
+                pcall(function() VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0) end)
             end
 
             -- ANTI-CHEAT FIX: 0.85s to 1.15s cooldown strictly obeys TWW's internal pickaxe speeds.
