@@ -155,12 +155,16 @@ local Config = {
     SmartMiningEnabled = false,
     AutoLootGems = true,
     MiningFailsafeTimeout = 600, -- safety net only; smart mining ends on depletion text, not this timer
+    PickaxeSwingCooldown = 1.2, -- base seconds between swings (human-like cadence, tunable via slider)
+    SwingJitterRange = 0.18, -- +/- random variance on swing timing (input irregularity -> anti-detection)
     OreESPEnabled = false,
     AutoStampNodes = false,
     AutoSellEnabled = false,
     SellRouteFile = "SellRoute.json",
     ReturnRouteFile = "ReturnRoute.json",
-    InventoryFullText = "cannot carry"
+    InventoryFullText = "cannot carry",
+    SellAtSlots = 40,
+    BackpackCapacity = 40
 }
 
 if writefile then
@@ -527,6 +531,34 @@ task.spawn(function()
     end
 end)
 
+local function detectOreType(model)
+    local knownOres = {
+        coal = "Coal", copper = "Copper", zinc = "Zinc", iron = "Iron",
+        gold = "Gold", silver = "Silver", diamond = "Diamond", emerald = "Emerald",
+        ruby = "Ruby", sapphire = "Sapphire", tin = "Tin", bronze = "Bronze",
+        limestone = "Limestone", saltpeter = "Saltpeter", sulfur = "Sulfur",
+        quartz = "Quartz", agate = "Agate", jasper = "Jasper", amethyst = "Amethyst",
+        topaz = "Topaz", onyx = "Onyx", malachite = "Malachite"
+    }
+    -- Scan the model and its ancestors' parts for an ore type in the name.
+    local function scan(container)
+        for _, part in ipairs(container:GetDescendants()) do
+            local n = string.lower(part.Name)
+            for kw, label in pairs(knownOres) do
+                if string.find(n, kw) then return label end
+            end
+        end
+    end
+    local name = scan(model)
+    if name then return name end
+    -- Also check the model's own name (some nodes are named directly "Coal", etc.)
+    local mn = string.lower(tostring(model.Name))
+    for kw, label in pairs(knownOres) do
+        if string.find(mn, kw) then return label end
+    end
+    return nil
+end
+
 local function renderESPForModel(model, pPos)
     if not model or not model.Parent then return end
     local primary = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
@@ -550,6 +582,23 @@ local function renderESPForModel(model, pPos)
     elseif not hasBase and not hasActiveOre then
         statusText = "❓ UNKNOWN"
         highlightColor = Color3.fromRGB(255, 150, 0)
+    end
+
+    -- ORE TYPE LABEL: Try to show which ore is in this node (Coal, Copper, Zinc,
+    -- Iron, Gold, Silver, etc.). TWW names the node parts after the ore type, so
+    -- we scan child part names and strip common noise suffixes.
+    local oreName = detectOreType(model)
+    if oreName then
+        statusText = "⛏️ " .. oreName
+        if hasBase and not hasActiveOre then
+            statusText = "❌ " .. oreName .. " (empty)"
+        end
+    else
+        -- Fall back to the model's own name if it looks like an ore name
+        local mName = string.lower(tostring(model.Name))
+        if string.find(mName, "rock") == nil and mName ~= "" and #mName <= 20 then
+            statusText = "⛏️ " .. (model.Name):gsub("^%l", string.upper)
+        end
     end
 
     local distStr = ""
@@ -1746,21 +1795,29 @@ do
         Config.MiningFailsafeTimeout = math.floor(val)
     end, 4)
 
-    createSectionHeader(miningPage, "ESP & Auto-Detection", 5)
+    createSliderRow(miningPage, "SwingCooldownSlider", "Swing Speed (secs, lower=faster)", 0.6, 2.5, Config.PickaxeSwingCooldown, "%.2fs", function(val)
+        Config.PickaxeSwingCooldown = val
+    end, 5)
+
+    createSectionHeader(miningPage, "ESP & Auto-Detection", 6)
 
     createToggleRow(miningPage, "OreESPToggle", "Enable Ore ESP (Zero-Lag Spatial)", Color3.fromRGB(255, 150, 0), function(state)
         Config.OreESPEnabled = state
-    end, 6, Config.OreESPEnabled)
+    end, 7, Config.OreESPEnabled)
 
     createToggleRow(miningPage, "AutoStampToggle", "Auto-Stamp Mine Nodes (Walk-By)", Color3.fromRGB(0, 170, 255), function(state)
         Config.AutoStampNodes = state
-    end, 7, Config.AutoStampNodes)
+    end, 8, Config.AutoStampNodes)
 
-    createSectionHeader(miningPage, "Auto-Sell & Inventory", 8)
+    createSectionHeader(miningPage, "Auto-Sell & Inventory", 9)
 
     createToggleRow(miningPage, "AutoSellToggle", "Auto-Sell on Backpack Full", Color3.fromRGB(255, 170, 0), function(state)
         Config.AutoSellEnabled = state
-    end, 9, Config.AutoSellEnabled)
+    end, 10, Config.AutoSellEnabled)
+
+    createSliderRow(miningPage, "SellAtSlotsSlider", "Backpack Slots Before Sell", 1, Config.BackpackCapacity, Config.SellAtSlots, "%d / 40 Slots", function(val)
+        Config.SellAtSlots = math.floor(val)
+    end, 11)
 
     local function createRouteInputRow(parent, name, placeholder, defaultText, order, onChange)
         local row = Instance.new("Frame")
@@ -2387,6 +2444,11 @@ do
         for k in pairs(scriptConnections) do scriptConnections[k] = nil end
 
         if visualizerFolder then visualizerFolder:Destroy() end
+        -- Destroy remaining ore ESP (workspace Highlights live in espFolder and would
+        -- otherwise persist after the script unloads even though the billboards are
+        -- removed with screenGui).
+        if espFolder then espFolder:Destroy() end
+        for k in pairs(activeESPObjects) do activeESPObjects[k] = nil end
         _G.Autofarm_Control = nil
         if screenGui then screenGui:Destroy() end
         print("[ManniskaFarm] Unloaded successfully.")
@@ -2997,6 +3059,21 @@ local function aimAt(targetPos)
     end
 end
 
+-- Returns the on-screen pixel (x,y,onScreen) of a world position, used to click
+-- exactly ON the ore instead of the fixed viewport center. Clicking the actual
+-- ore screen-position is far more reliable -- center-clicks hit empty space
+-- whenever the deposit isn't perfectly centered, which reads as "hitting air"
+-- and triggers the 600s cooldown flag.
+local function oreScreenPos(cam, worldPos)
+    if not cam then return 0, 0, false end
+    local vp = cam.ViewportSize
+    local screen, onScreen = cam:WorldToScreenPoint(worldPos)
+    if not onScreen then
+        return math.floor(vp.X / 2), math.floor(vp.Y / 2), false
+    end
+    return math.floor(screen.X), math.floor(screen.Y), true
+end
+
 local function executeMiningNode(data, root)
     -- LIVE ROCK RE-SCAN: Don't trust stale recorded positions.
     local baseTarget = data.promptPos or data.pos
@@ -3039,9 +3116,37 @@ local function executeMiningNode(data, root)
 
     local manualTimer = data.actionHoldDuration or 15.0
     
+    -- ANTI-CHEAT FIX (E): Random pause before mining starts, so the bot isn't
+    -- frame-perfect when arriving at a rock. Real players pause to look around.
+    task.wait(0.4 + math.random() * 1.2)
+
+    -- ANTI-CHEAT FIX (D): Staggered pickaxe equip. Rather than one crisp keypress,
+    -- add random micro-delays around it so the input stream isn't pattern-identical.
+    if VirtualInputManager then
+        pcall(function()
+            task.wait(0.08 + math.random() * 0.15)
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Four, false, game)
+            task.wait(0.06 + math.random() * 0.08)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Four, false, game)
+            task.wait(0.15 + math.random() * 0.2)
+        end)
+    end
+    task.wait(0.7 + math.random() * 0.3)
+    aimAt(targetPosition)
+
     -- ANTI-CHEAT: Calculate the absolute center of the screen to click on
     local cx = camera and math.floor(camera.ViewportSize.X / 2) or 0
     local cy = camera and math.floor(camera.ViewportSize.Y / 2) or 0
+
+    -- ANTI-CHEAT FIX (B): helper to get a jittered click position on the ore, so the
+    -- mouse isn't perfectly static (a fixed pixel every swing is a script signature).
+    local function jitteredClickPos()
+        if not targetPosition then return cx, cy end
+        local x, y = oreScreenPos(camera, targetPosition)
+        -- Small human-like spread around the rock, plus rare larger dart.
+        local spread = math.random() < 0.9 and math.random(-6, 6) or math.random(-18, 18)
+        return math.max(0, x + spread), math.max(0, y + spread)
+    end
 
     if Config.SmartMiningEnabled then
         -- Failsafe is only a safety net (default 600s). Mining normally ends when
@@ -3082,18 +3187,10 @@ local function executeMiningNode(data, root)
             end
         end)
 
-        -- 🔴 HOLD-TO-MINE PHASE: Press Mouse 1 DOWN and hold it (matches how real
-        -- players mine in Wild West -- the game controls pickaxe swing cadence).
-        if VirtualInputManager then
-            pcall(function() VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, true, game, 0) end)
-        end
-
-        -- The camera (RenderStepped above) keeps the view on the deposit so the
-        -- hold-to-mine hit-test hits the rock. We keep the CHARACTER facing it too,
-        -- but do NOT hard-write root.CFrame every tick -- writing it constantly while
-        -- the swing animation runs causes the shaking and cancels the swing. Instead
-        -- we re-aim the body only occasionally via aimAt (its PlatformStand trick
-        -- makes the rotation stick without fighting the animation).
+        -- 🔴 TAP-BASED SWING PHASE (Fix A): press/release the mouse per swing with a
+        -- humanized, jittered cooldown instead of holding Mouse 1 down. Holding =
+        -- perfectly regular input stream = easy to flag. A tap + varied delay looks
+        -- like a real player's cadence. Click lands ON the ore + jittered (Fix B).
         local lastScan = 0
         local lastBodyAim = 0
         local lastRockRescan = 0
@@ -3120,10 +3217,30 @@ local function executeMiningNode(data, root)
                 aimAt(targetPosition)
             end
 
+            -- Swing: one tap at the (jittered) ore screen position.
+            local sX, sY = jitteredClickPos()
+            if VirtualInputManager then
+                pcall(function() VirtualInputManager:SendMouseButtonEvent(sX, sY, 0, true, game, 0) end)
+                task.wait(0.05 + math.random() * 0.06) -- random press duration
+                pcall(function() VirtualInputManager:SendMouseButtonEvent(sX, sY, 0, false, game, 0) end)
+            end
+
+            -- Random extra delay sometimes, so the cadence isn't a fixed metronome.
+            local extraDelay = 0
+            if math.random() < 0.3 then extraDelay = math.random() * 0.35 end
+
+            -- Humanized swing cooldown: base + jitter so the input stream is irregular
+            -- (a rock-solid fixed rate is an easy anti-cheat signature). Applied on
+            -- EVERY swing, including when the text scan is throttled.
+            local baseCooldown = Config.PickaxeSwingCooldown or 1.3
+            local jitter = Config.SwingJitterRange or 0.15
+            local swingDelay = baseCooldown + (math.random() * 2 - 1) * jitter
+            swingDelay = math.max(swingDelay, 0.9)
+
             -- The expensive UI text scan is throttled to every 0.3s; scanning every
             -- 50ms server-crawls the whole PlayerGui and is the main reason FPS drops.
             if tick() - lastScan < 0.3 then
-                task.wait(0.05)
+                task.wait(swingDelay + extraDelay)
                 continue
             end
             lastScan = tick()
@@ -3167,10 +3284,10 @@ local function executeMiningNode(data, root)
                 end
             end
 
-            task.wait(0.05) -- check loop while the game natively swings the pickaxe
+            task.wait(swingDelay + extraDelay)
         end
 
-        -- release phase: Let go of Mouse 1
+        -- Safe release (in case anything left the button down)
         if VirtualInputManager then
             pcall(function() VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, false, game, 0) end)
         end
@@ -3179,21 +3296,27 @@ local function executeMiningNode(data, root)
     else
         showToast(string.format("Blind Mining: %.1fs", manualTimer))
         local swingStart = tick()
-        
-        -- hold-to-mine phase: Press Mouse 1 DOWN
-        if VirtualInputManager then
-            pcall(function() VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, true, game, 0) end)
-        end
-        
         while isPlaying and (tick() - swingStart) < manualTimer do
             -- Re-face the body occasionally via aimAt (PlatformStand rotation holds
             -- even with the tool equipped) WITHOUT hard-writing root.CFrame every
             -- tick, which caused shaking and cancelled the swing.
             if targetPosition then aimAt(targetPosition) end
-            task.wait(0.4)
+
+            -- Tap swing with humanized cooldown (same cadence as smart mining).
+            local bX, bY = jitteredClickPos()
+            if VirtualInputManager then
+                pcall(function() VirtualInputManager:SendMouseButtonEvent(bX, bY, 0, true, game, 0) end)
+                task.wait(0.05 + math.random() * 0.06)
+                pcall(function() VirtualInputManager:SendMouseButtonEvent(bX, bY, 0, false, game, 0) end)
+            end
+            local baseCooldown = Config.PickaxeSwingCooldown or 1.3
+            local jitter = Config.SwingJitterRange or 0.15
+            local swingDelay = baseCooldown + (math.random() * 2 - 1) * jitter
+            swingDelay = math.max(swingDelay, 0.9)
+            task.wait(swingDelay)
         end
-        
-        -- release phase: Let go of Mouse 1
+
+        -- release phase
         if VirtualInputManager then
             pcall(function() VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, false, game, 0) end)
         end
@@ -3430,18 +3553,22 @@ local function checkInventoryFull()
     if tick() - lastSellTime < 60 then return false end
 
     local customTrigger = string.lower(Config.InventoryFullText or "")
+    -- Sell when the backpack counter reaches the configured threshold (SellAtSlots
+    -- out of BackpackCapacity), e.g. 30/40. Default 40/40 = full.
+    local sellAt = Config.SellAtSlots or 40
     for _, desc in ipairs(playerGui:GetDescendants()) do
         -- Never match text from our OWN GUI (HUD/ESP/toasts), only the game's UI.
         if screenGui and desc:IsDescendantOf(screenGui) then continue end
         if desc:IsA("TextLabel") and desc.Visible then
             local txt = string.lower(desc.Text)
-            -- Definitive backpack counter: "40/40" is full when both sides are
-            -- equal. Only acts on real capacities (>=10) so quest counters like
-            -- "1/1" or "2/2" can't false-trigger a sell trip.
+            -- Definitive backpack counter: "x/40" -> sell when x >= SellAtSlots.
+            -- Only acts on real capacities (>=10) so quest counters like "1/1"
+            -- or "2/2" can't false-trigger a sell trip.
             local filled, cap = txt:match("(%d+)/(%d+)")
             if filled and cap
                 and tonumber(cap) >= 10
-                and tonumber(filled) >= tonumber(cap)
+                and tonumber(cap) >= tonumber(sellAt)
+                and tonumber(filled) >= tonumber(sellAt)
             then
                 return true
             end
